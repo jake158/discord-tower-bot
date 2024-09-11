@@ -17,7 +17,7 @@ public class Settings
             var settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(ConfigFileName))
             ?? throw new Exception("Failed to deserialize configuration file.");
 
-            if ((settings.Token == null) || string.IsNullOrEmpty(settings.Token))
+            if (string.IsNullOrEmpty(settings.Token))
             {
                 throw new Exception($"Token not specified in '{ConfigFileName}'");
             }

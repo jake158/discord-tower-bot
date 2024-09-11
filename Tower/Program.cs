@@ -1,24 +1,32 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tower;
 public class Program
 {
-    private static DiscordSocketClient _client = new();
+    private static readonly IServiceProvider _serviceProvider = CreateProvider();
+
+    static IServiceProvider CreateProvider()
+    {
+        var collection = new ServiceCollection()
+            .AddSingleton<DiscordSocketClient>();
+
+        return collection.BuildServiceProvider();
+    }
 
     public static async Task Main()
     {
-        _client.Log += Log;
+        var client = _serviceProvider.GetRequiredService<DiscordSocketClient>();
+
+        client.Log += Log;
 
         var settings = Settings.Load();
+        await client.LoginAsync(TokenType.Bot, settings.Token);
+        await client.StartAsync();
 
-        await _client.LoginAsync(TokenType.Bot, settings.Token);
-        await _client.StartAsync();
-
-        // Block this task until the program is closed.
-        await Task.Delay(-1);
+        await Task.Delay(Timeout.Infinite);
     }
-
 
     private static Task Log(LogMessage msg)
     {
