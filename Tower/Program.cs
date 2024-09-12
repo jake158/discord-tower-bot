@@ -1,41 +1,41 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Tower.Services.Configuration;
 using Tower.Services.Discord;
 
 namespace Tower;
-public class Program
+internal sealed class Program
 {
-    private static readonly IServiceProvider _services = CreateProvider();
-
-    static IServiceProvider CreateProvider()
+    public static async Task Main(string[] args)
     {
-        var config = new DiscordSocketConfig()
-        {
-            GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
-        };
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices((context, services) =>
+            {
+                services.AddSingleton(Settings.Load());
 
-        var collection = new ServiceCollection()
-            .AddSingleton(config)
-            .AddSingleton<DiscordSocketClient>()
-            .AddSingleton<LoggingService>()
-            .AddSingleton<MessageHandler>();
+                var config = new DiscordSocketConfig()
+                {
+                    GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+                };
 
-        return collection.BuildServiceProvider();
-    }
+                services
+                    .AddSingleton(config)
+                    .AddSingleton<DiscordSocketClient>()
+                    .AddSingleton<LoggingService>()
+                    .AddSingleton<MessageHandler>();
 
-    public static async Task Main()
-    {
-        var client = _services.GetRequiredService<DiscordSocketClient>();
+                services.AddHostedService<BotService>();
+            })
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddConsole();
+            })
+            .Build();
 
-        _services.GetRequiredService<LoggingService>();
-        _services.GetRequiredService<MessageHandler>();
-
-        var settings = Settings.Load();
-        await client.LoginAsync(TokenType.Bot, settings.Token);
-        await client.StartAsync();
-
-        await Task.Delay(Timeout.Infinite);
+        await host.RunAsync();
     }
 }
