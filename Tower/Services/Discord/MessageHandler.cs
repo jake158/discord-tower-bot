@@ -1,6 +1,6 @@
 using Discord.WebSocket;
 
-namespace Tower;
+namespace Tower.Services.Discord;
 public class MessageHandler
 {
     public MessageHandler(DiscordSocketClient client)
@@ -11,10 +11,6 @@ public class MessageHandler
     private async Task HandleMessageAsync(SocketMessage messageParam)
     {
         if (messageParam is not SocketUserMessage message || message.Author.IsBot) return;
-
-        await Task.Run(() =>
-        {
-            Console.WriteLine($"Handling attachments for message {message}...");
-        });
+        Console.WriteLine($"Handling attachments for message {message}...");
     }
 }

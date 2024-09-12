@@ -1,7 +1,7 @@
 using Discord;
 using Discord.WebSocket;
 
-namespace Tower;
+namespace Tower.Services.Discord;
 public class LoggingService
 {
     public LoggingService(DiscordSocketClient client)

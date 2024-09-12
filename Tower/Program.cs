@@ -1,6 +1,8 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Tower.Services.Configuration;
+using Tower.Services.Discord;
 
 namespace Tower;
 public class Program

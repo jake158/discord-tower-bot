@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Tower;
+namespace Tower.Services.Configuration;
 public class Settings
 {
     public string? Token { get; init; }
