@@ -9,10 +9,8 @@ internal sealed class BotService : IHostedService
 {
     private readonly Settings _settings;
     private readonly DiscordSocketClient _client;
-#pragma warning disable IDE0052
     private readonly LoggingService _loggingService;
     private readonly MessageHandler _messageHandler;
-#pragma warning restore IDE0052
     private readonly ILogger<BotService> _logger;
 
     public BotService(
@@ -31,10 +29,24 @@ internal sealed class BotService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        _client.Log += _loggingService.LogAsync;
+        _client.MessageReceived += _messageHandler.HandleMessageAsync;
+
+        _logger.LogInformation("Starting Tower...");
+
         await _client.LoginAsync(TokenType.Bot, _settings.Token);
         await _client.StartAsync();
 
-        await Task.Delay(Timeout.Infinite, cancellationToken);
+        _logger.LogInformation("Tower has started");
+
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Cancellation requested");
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -43,6 +55,6 @@ internal sealed class BotService : IHostedService
 
         await _client.StopAsync();
 
-        _logger.LogInformation("Tower has stopped.");
+        _logger.LogInformation("Tower has stopped");
     }
 }
