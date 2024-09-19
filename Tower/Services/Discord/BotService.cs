@@ -9,27 +9,27 @@ internal sealed class BotService : IHostedService
 {
     private readonly Settings _settings;
     private readonly DiscordSocketClient _client;
-    private readonly LoggingService _loggingService;
+    private readonly DiscordLogHandler _discordLogHandler;
     private readonly MessageHandler _messageHandler;
     private readonly ILogger<BotService> _logger;
 
     public BotService(
         Settings settings,
         DiscordSocketClient client,
-        LoggingService loggingService,
+        DiscordLogHandler discordLogHandler,
         MessageHandler messageHandler,
         ILogger<BotService> logger)
     {
         _settings = settings;
         _client = client;
-        _loggingService = loggingService;
+        _discordLogHandler = discordLogHandler;
         _messageHandler = messageHandler;
         _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _client.Log += _loggingService.LogAsync;
+        _client.Log += _discordLogHandler.LogAsync;
         _client.MessageReceived += _messageHandler.HandleMessageAsync;
 
         _logger.LogInformation("Starting Tower...");

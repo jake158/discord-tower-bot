@@ -2,11 +2,11 @@ using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tower.Services.Discord;
-internal sealed class LoggingService
+internal sealed class DiscordLogHandler
 {
-    private readonly ILogger<LoggingService> _logger;
+    private readonly ILogger<DiscordLogHandler> _logger;
 
-    public LoggingService(ILogger<LoggingService> logger)
+    public DiscordLogHandler(ILogger<DiscordLogHandler> logger)
     {
         _logger = logger;
     }
