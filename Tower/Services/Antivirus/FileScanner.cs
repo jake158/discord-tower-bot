@@ -5,10 +5,36 @@ namespace Tower.Services.Antivirus;
 public class FileScanner
 {
     private readonly ILogger<FileScanner> _logger;
+    private NamedPipeClientStream? _pipeClient;
+    private StreamReader? _reader;
+    private StreamWriter? _writer;
 
     public FileScanner(ILogger<FileScanner> logger)
     {
         _logger = logger;
+        InitializePipeConnection();
+    }
+
+    private void InitializePipeConnection()
+    {
+        _pipeClient = new NamedPipeClientStream(
+            serverName: ".",
+            pipeName: "TowerScanPipe",
+            direction: PipeDirection.InOut,
+            options: PipeOptions.Asynchronous);
+
+        try
+        {
+            _pipeClient.Connect(1000);
+            _writer = new StreamWriter(_pipeClient) { AutoFlush = true };
+            _reader = new StreamReader(_pipeClient);
+            _logger.LogInformation("Connected to the antivirus server");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to connect to the antivirus server: {ex.Message}");
+            _pipeClient = null;
+        }
     }
 
     public async Task<ScanResult> ScanFileAtUrlAsync(Uri fileUri, CancellationToken cancellationToken)
@@ -21,7 +47,7 @@ public class FileScanner
 
         try
         {
-            var result = await DoAntivirusScanAsync(filePath, cancellationToken);
+            var result = await DoAntivirusScanAsync(filePath);
             return result;
         }
         finally
@@ -32,6 +58,7 @@ public class FileScanner
 
     private static async Task<string> DownloadFileAsync(Uri fileUri, CancellationToken cancellationToken)
     {
+        // TODO: Add handling file naming conflicts
         var filePath = Path.Combine(Path.GetTempPath(), Path.GetFileName(fileUri.LocalPath));
 
         using (HttpClient client = new())
@@ -40,31 +67,36 @@ public class FileScanner
             response.EnsureSuccessStatusCode();
 
             using var fs = new FileStream(filePath, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
+            await response.Content.CopyToAsync(fs, cancellationToken);
         }
         return filePath;
     }
 
-    private async Task<ScanResult> DoAntivirusScanAsync(string filePath, CancellationToken cancellationToken)
+    private async Task<ScanResult> DoAntivirusScanAsync(string filePath)
     {
-        _logger.LogInformation($"Sending file {filePath} for antivirus scanning via named pipes");
-
         var scanResult = new ScanResult(filePath, isMalware: false, isSuspicious: false);
 
         try
         {
-            using var pipeClient = new NamedPipeClientStream(".", Path.Combine(Path.GetTempPath(), "TowerScanPipe"), PipeDirection.InOut);
-            await pipeClient.ConnectAsync(1000, cancellationToken);
+            if (_pipeClient == null || !_pipeClient.IsConnected)
+            {
+                _logger.LogWarning("Pipe client is not connected. Reconnecting...");
+                InitializePipeConnection();
+            }
+            ArgumentNullException.ThrowIfNull(_writer, nameof(_writer));
+            ArgumentNullException.ThrowIfNull(_reader, nameof(_reader));
 
-            using var writer = new StreamWriter(pipeClient);
-            using var reader = new StreamReader(pipeClient);
-            await writer.WriteLineAsync(filePath);
-            await writer.FlushAsync();
+            _logger.LogInformation($"Sending file {filePath} for antivirus scanning.");
 
-            var response = await reader.ReadLineAsync();
-            ArgumentNullException.ThrowIfNull(response, nameof(response));
+            await _writer.WriteLineAsync(filePath);
 
-            _logger.LogInformation($"Received response from host scanner: {response}");
+            var response = await _reader.ReadLineAsync();
+            if (string.IsNullOrEmpty(response))
+            {
+                throw new InvalidOperationException("Received an empty response from the antivirus server.");
+            }
+
+            _logger.LogInformation($"Received response from antivirus server: {response}");
 
             if (response.Contains("DETECTED THREATS"))
             {
@@ -73,8 +105,15 @@ public class FileScanner
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error scanning file {filePath} via named pipes: {ex.Message}");
+            _logger.LogError($"Error scanning file {filePath}: {ex.Message}");
         }
         return scanResult;
+    }
+
+    ~FileScanner()
+    {
+        _writer?.Dispose();
+        _reader?.Dispose();
+        _pipeClient?.Dispose();
     }
 }
