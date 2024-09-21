@@ -14,7 +14,7 @@ public class URLScanner
         // _googleApiKey = settings.GoogleApiKey;
     }
 
-    public async Task<ScanResult> ScanUrlAsync(Uri webUri)
+    public async Task<ScanResult> ScanUrlAsync(Uri webUri, CancellationToken cancellationToken)
     {
         if (webUri.IsFile)
         {

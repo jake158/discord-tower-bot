@@ -16,11 +16,11 @@ internal sealed class Program
         .ConfigureServices((context, services) =>
         {
             services
+                .AddSingleton<IAntivirusScanQueue, AntivirusScanQueue>()
                 .AddSingleton<FileScanner>()
-                .AddSingleton<URLScanner>()
-                .AddSingleton<AntivirusService>();
+                .AddSingleton<URLScanner>();
 
-            services.AddHostedService(provider => provider.GetRequiredService<AntivirusService>());
+            services.AddHostedService<AntivirusService>();
 
 
             var config = new DiscordSocketConfig()
@@ -40,6 +40,7 @@ internal sealed class Program
         {
             logging.ClearProviders();
             logging.AddConsole();
+            logging.SetMinimumLevel(LogLevel.Debug);
         })
         .Build();
 

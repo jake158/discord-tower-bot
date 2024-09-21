@@ -8,26 +8,32 @@ namespace Tower.Services.Discord;
 public class MessageHandler
 {
     private readonly ILogger<MessageHandler> _logger;
-    private readonly AntivirusService _antivirusService;
+    private readonly IAntivirusScanQueue _scanQueue;
 
-    public MessageHandler(ILogger<MessageHandler> logger, AntivirusService antivirusService)
+    public MessageHandler(ILogger<MessageHandler> logger, IAntivirusScanQueue scanQueue)
     {
         _logger = logger;
-        _antivirusService = antivirusService;
-        _antivirusService.OnMalwareFound += OnMalwareFound;
+        _scanQueue = scanQueue;
     }
 
-    public Task HandleMessageAsync(SocketMessage messageParam)
+    public async Task HandleMessageAsync(SocketMessage messageParam)
     {
-        // TODO: Submit ScanRequests instead of Enqueuing URLs
-        if (messageParam is not SocketUserMessage message || message.Author.IsBot) return Task.CompletedTask;
+        if (messageParam is not SocketUserMessage message || message.Author.IsBot) return;
 
-        _logger.LogInformation($"Handling attachments for message '{message}', Author: {message.Author.Username}");
+        _logger.LogDebug($"Processing message: {message}");
 
         foreach (IAttachment attachment in message.Attachments)
         {
-            _logger.LogInformation($"Enqueuing attachment for scanning: {attachment.Url}");
-            _antivirusService.EnqueueUrl(new Uri(attachment.Url));
+            _logger.LogDebug($"Enqueuing attachment for scanning: {attachment.Url}");
+
+            var scanResult = await _scanQueue.QueueScanAsync(new Uri(attachment.Url), true);
+
+            _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
+
+            if (scanResult.IsMalware || scanResult.IsSuspicious)
+            {
+                OnMalwareFound(scanResult, message);
+            }
         }
 
         var linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -37,19 +43,28 @@ public class MessageHandler
         {
             try
             {
-                _logger.LogInformation($"Enqueuing URL for scanning: {link}");
-                _antivirusService.EnqueueUrl(new Uri(link));
+                _logger.LogDebug($"Enqueuing URL for scanning: {link}");
+
+                var scanResult = await _scanQueue.QueueScanAsync(new Uri(link));
+
+                _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
+
+                if (scanResult.IsMalware || scanResult.IsSuspicious)
+                {
+                    OnMalwareFound(scanResult, message);
+                }
             }
             catch (UriFormatException)
             {
-                _logger.LogInformation($"Not a valid URL: {link}");
+                _logger.LogError($"Not a valid URL: {link}");
             }
         }
-        return Task.CompletedTask;
     }
 
-    private void OnMalwareFound(ScanResult result)
+    private async void OnMalwareFound(ScanResult scanResult, SocketUserMessage message)
     {
-        _logger.LogInformation($"Malware found in {result.Name}");
+        _logger.LogInformation($"Malware found in {scanResult.Name}");
+
+        await message.ReplyAsync($"Malware found in ${scanResult.Name}");
     }
 }
