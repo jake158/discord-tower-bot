@@ -11,32 +11,32 @@ public class FileScanner
         _logger = logger;
     }
 
-    public async Task<ScanResult> ScanFileAtUrlAsync(Uri fileUri)
+    public async Task<ScanResult> ScanFileAtUrlAsync(Uri fileUri, CancellationToken cancellationToken)
     {
-        if (!fileUri.IsFile)
-        {
-            throw new ArgumentException("The provided URI is not a file", nameof(fileUri));
-        }
-
         _logger.LogInformation($"Downloading file from URL: {fileUri.AbsoluteUri}");
 
-        string filePath = await DownloadFileAsync(fileUri);
+        string filePath = await DownloadFileAsync(fileUri, cancellationToken);
 
         _logger.LogInformation($"File downloaded to {filePath}, starting scan...");
 
-        var result = await DoAntivirusScanAsync(filePath);
-        File.Delete(filePath);
-
-        return result;
+        try
+        {
+            var result = await DoAntivirusScanAsync(filePath, cancellationToken);
+            return result;
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
     }
 
-    private static async Task<string> DownloadFileAsync(Uri fileUri)
+    private static async Task<string> DownloadFileAsync(Uri fileUri, CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(Path.GetTempPath(), Path.GetFileName(fileUri.LocalPath));
 
         using (HttpClient client = new())
         {
-            var response = await client.GetAsync(fileUri);
+            var response = await client.GetAsync(fileUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             using var fs = new FileStream(filePath, FileMode.Create);
@@ -45,7 +45,7 @@ public class FileScanner
         return filePath;
     }
 
-    private async Task<ScanResult> DoAntivirusScanAsync(string filePath)
+    private async Task<ScanResult> DoAntivirusScanAsync(string filePath, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Sending file {filePath} for antivirus scanning via named pipes");
 
@@ -53,8 +53,8 @@ public class FileScanner
 
         try
         {
-            using var pipeClient = new NamedPipeClientStream(".", "TowerScanPipe", PipeDirection.InOut);
-            await pipeClient.ConnectAsync();
+            using var pipeClient = new NamedPipeClientStream(".", Path.Combine(Path.GetTempPath(), "TowerScanPipe"), PipeDirection.InOut);
+            await pipeClient.ConnectAsync(1000, cancellationToken);
 
             using var writer = new StreamWriter(pipeClient);
             using var reader = new StreamReader(pipeClient);
