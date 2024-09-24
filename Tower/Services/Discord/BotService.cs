@@ -1,26 +1,27 @@
+using System.ComponentModel.DataAnnotations;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Tower.Services.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Tower.Services.Discord;
 internal sealed class BotService : IHostedService
 {
-    private readonly Settings _settings;
     private readonly DiscordSocketClient _client;
     private readonly DiscordLogHandler _discordLogHandler;
     private readonly MessageHandler _messageHandler;
     private readonly ILogger<BotService> _logger;
+    private readonly string _token;
 
     public BotService(
-        Settings settings,
+        IOptions<Settings> options,
         DiscordSocketClient client,
         DiscordLogHandler discordLogHandler,
         MessageHandler messageHandler,
         ILogger<BotService> logger)
     {
-        _settings = settings;
+        _token = options.Value.Token;
         _client = client;
         _discordLogHandler = discordLogHandler;
         _messageHandler = messageHandler;
@@ -34,7 +35,7 @@ internal sealed class BotService : IHostedService
 
         _logger.LogInformation("Starting Tower...");
 
-        await _client.LoginAsync(TokenType.Bot, _settings.Token);
+        await _client.LoginAsync(TokenType.Bot, _token);
         await _client.StartAsync();
 
         _logger.LogInformation("Tower has started");
@@ -56,5 +57,11 @@ internal sealed class BotService : IHostedService
         await _client.StopAsync();
 
         _logger.LogInformation("Tower has stopped");
+    }
+
+    public class Settings
+    {
+        [Required]
+        public string Token { get; set; } = "";
     }
 }
