@@ -1,4 +1,5 @@
 ﻿using Discord;
+using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,15 +54,31 @@ internal sealed class Program
             {
                 GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
             };
+
             services
                 .AddSingleton(discordSocketConfig)
                 .AddSingleton<DiscordSocketClient>()
                 .AddSingleton<DiscordLogHandler>()
-                .AddSingleton<MessageHandler>()
+                .AddSingleton<MessageHandler>();
+
+
+            var interactionServiceConfig = new InteractionServiceConfig()
+            {
+                UseCompiledLambda = true
+            };
+
+            services.AddSingleton<InteractionService>(serviceProvider =>
+            {
+                var client = serviceProvider.GetRequiredService<DiscordSocketClient>();
+                return new InteractionService(client.Rest, interactionServiceConfig);
+            });
+
+            services
                 .AddOptions<BotService.Settings>()
                 .Bind(config.GetRequiredSection("Discord"));
 
             services.AddHostedService<BotService>();
+
         })
         .ConfigureLogging(logging =>
         {
