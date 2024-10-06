@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
 public class AntivirusService : BackgroundService

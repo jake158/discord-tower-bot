@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.IO.Pipes;
+using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
 public class FileScanner

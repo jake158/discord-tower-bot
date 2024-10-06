@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
 public class AntivirusScanQueue : IAntivirusScanQueue
@@ -19,7 +20,7 @@ public class AntivirusScanQueue : IAntivirusScanQueue
         _queue = Channel.CreateBounded<ScanRequest>(options);
     }
 
-    public async Task<ScanResult> QueueScanAsync(Uri url, bool? isFile = null)
+    public async Task<Task<ScanResult>> QueueScanAsync(Uri url, bool? isFile = null)
     {
         if (url is null)
         {
@@ -31,7 +32,7 @@ public class AntivirusScanQueue : IAntivirusScanQueue
 
         await _queue.Writer.WriteAsync(scanRequest);
 
-        return await tcs.Task;
+        return tcs.Task;
     }
 
     public async ValueTask<ScanRequest> DequeueAsync(CancellationToken cancellationToken)

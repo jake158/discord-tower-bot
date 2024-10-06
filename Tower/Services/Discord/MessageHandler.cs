@@ -3,6 +3,7 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 using Tower.Services.Antivirus;
+using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Discord;
 public class MessageHandler
@@ -26,7 +27,8 @@ public class MessageHandler
         {
             _logger.LogDebug($"Enqueuing attachment for scanning: {attachment.Url}");
 
-            var scanResult = await _scanQueue.QueueScanAsync(new Uri(attachment.Url), true);
+            var scanTask = await _scanQueue.QueueScanAsync(new Uri(attachment.Url), true);
+            var scanResult = await scanTask;
 
             _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
 
@@ -45,7 +47,8 @@ public class MessageHandler
             {
                 _logger.LogDebug($"Enqueuing URL for scanning: {link}");
 
-                var scanResult = await _scanQueue.QueueScanAsync(new Uri(link));
+                var scanTask = await _scanQueue.QueueScanAsync(new Uri(link));
+                var scanResult = await scanTask;
 
                 _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
 

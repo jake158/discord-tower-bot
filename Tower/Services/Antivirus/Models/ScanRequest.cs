@@ -1,5 +1,5 @@
 
-namespace Tower.Services.Antivirus;
+namespace Tower.Services.Antivirus.Models;
 public readonly struct ScanRequest
 {
     public Uri Url { get; init; }
