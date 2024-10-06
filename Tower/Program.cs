@@ -1,10 +1,13 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tower.Persistence;
 using Tower.Services.Antivirus;
 using Tower.Services.Discord;
 
@@ -39,6 +42,20 @@ internal sealed class Program
         .ConfigureServices((context, services) =>
         {
             var config = context.Configuration;
+
+            services.AddDbContext<TowerDbContext>(options =>
+            {
+                var connectionString = config.GetConnectionString("DefaultConnection");
+                var conStrBuilder = new SqlConnectionStringBuilder(connectionString)
+                {
+                    Password = config["ConnectionStrings:SqlServerPassword"]
+                };
+                var connection = conStrBuilder.ConnectionString;
+
+                options.UseSqlServer(connection);
+            });
+
+
             int antivirusQueueCapacity = config.GetValue<int>("Antivirus:QueueCapacity");
             Console.WriteLine($"Antivirus queue capacity: {antivirusQueueCapacity}");
 
@@ -55,23 +72,21 @@ internal sealed class Program
                 GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
             };
 
-            services
-                .AddSingleton(discordSocketConfig)
-                .AddSingleton<DiscordSocketClient>()
-                .AddSingleton<DiscordLogHandler>()
-                .AddSingleton<MessageHandler>();
-
-
             var interactionServiceConfig = new InteractionServiceConfig()
             {
                 UseCompiledLambda = true
             };
 
-            services.AddSingleton<InteractionService>(serviceProvider =>
-            {
-                var client = serviceProvider.GetRequiredService<DiscordSocketClient>();
-                return new InteractionService(client.Rest, interactionServiceConfig);
-            });
+            services
+                .AddSingleton(discordSocketConfig)
+                .AddSingleton<DiscordSocketClient>()
+                .AddSingleton<DiscordLogHandler>()
+                .AddSingleton<MessageHandler>()
+                .AddSingleton<InteractionService>(serviceProvider =>
+                {
+                    var client = serviceProvider.GetRequiredService<DiscordSocketClient>();
+                    return new InteractionService(client.Rest, interactionServiceConfig);
+                });
 
             services
                 .AddOptions<BotService.Settings>()
