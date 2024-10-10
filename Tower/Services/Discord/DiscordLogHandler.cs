@@ -23,7 +23,7 @@ internal sealed class DiscordLogHandler
             LogSeverity.Debug => LogLevel.Trace,
             _ => LogLevel.Information
         };
-        _logger.Log(logLevel, message.Exception, message.Message);
+        _logger.Log(logLevel, message.Exception, "[{Source}] {Message}", message.Source, message.Message);
 
         return Task.CompletedTask;
     }

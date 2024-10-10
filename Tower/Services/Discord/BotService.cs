@@ -44,6 +44,7 @@ internal sealed class BotService : IHostedService
     {
         _client.Log += _discordLogHandler.LogAsync;
         _client.MessageReceived += _messageHandler.HandleMessageAsync;
+        _interactionService.Log += _discordLogHandler.LogAsync;
 
         _client.InteractionCreated += async (x) =>
         {
