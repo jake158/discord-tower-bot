@@ -21,7 +21,7 @@ public class TowerDbContext : DbContext
         modelBuilder.Entity<UserOffenseEntity>()
             .HasOne(uo => uo.Guild)
             .WithMany()
-            .HasForeignKey(uo => uo.GuildID)
+            .HasForeignKey(uo => uo.GuildId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

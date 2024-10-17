@@ -10,7 +10,7 @@ public class UserStatsEntity
 
     public int TotalScans { get; set; } = 0;
     public int ScansToday { get; set; } = 0;
-    public DateTime LastScanDate { get; set; }
+    public DateTime? LastScanDate { get; set; } = null;
 
-    public UserEntity User { get; set; } = null!;
+    public virtual UserEntity User { get; set; } = null!;
 }

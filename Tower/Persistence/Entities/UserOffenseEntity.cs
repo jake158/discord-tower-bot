@@ -9,12 +9,12 @@ public class UserOffenseEntity
     [ForeignKey(nameof(User))]
     public ulong UserId { get; set; }
     [ForeignKey(nameof(Guild))]
-    public ulong? GuildID { get; set; }
+    public ulong? GuildId { get; set; }
 
     [StringLength(100)]
     public string OffenseDetails { get; set; } = null!;
     public DateTime OffenseDate { get; set; }
 
-    public UserEntity User { get; set; } = null!;
-    public GuildEntity? Guild { get; set; } = null;
+    public virtual UserEntity User { get; set; } = null!;
+    public virtual GuildEntity? Guild { get; set; } = null;
 }

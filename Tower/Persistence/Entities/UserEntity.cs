@@ -6,14 +6,12 @@ public class UserEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
     public ulong UserId { get; set; }
-    [StringLength(32)]
-    public string Username { get; set; } = null!;
     public bool Blacklisted { get; set; } = false;
 
-    private ICollection<GuildEntity>? _guilds;
+    private ICollection<GuildEntity>? _ownedGuilds;
     private ICollection<UserOffenseEntity>? _offenses;
 
-    public ICollection<GuildEntity> Guilds => _guilds ??= new List<GuildEntity>();
-    public ICollection<UserOffenseEntity> Offenses => _offenses ??= new List<UserOffenseEntity>();
-    public UserStatsEntity? Stats { get; set; }
+    public virtual ICollection<GuildEntity> OwnedGuilds => _ownedGuilds ??= new List<GuildEntity>();
+    public virtual ICollection<UserOffenseEntity> Offenses => _offenses ??= new List<UserOffenseEntity>();
+    public virtual UserStatsEntity Stats { get; set; } = null!;
 }

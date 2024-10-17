@@ -11,5 +11,5 @@ public class GuildSettingsEntity
     public bool IsScanEnabled { get; set; } = true;
     public ulong? AlertChannel { get; set; } = null;
 
-    public GuildEntity Guild { get; set; } = null!;
+    public virtual GuildEntity Guild { get; set; } = null!;
 }

@@ -9,8 +9,10 @@ public class GuildStatsEntity
     public ulong GuildId { get; set; }
 
     public int TotalScans { get; set; } = 0;
+    public int ScansToday { get; set; } = 0;
     public int MalwareFoundCount { get; set; } = 0;
     public DateTime JoinDate { get; set; }
+    public DateTime? LastScanDate { get; set; } = null;
 
-    public GuildEntity Guild { get; set; } = null!;
+    public virtual GuildEntity Guild { get; set; } = null!;
 }
