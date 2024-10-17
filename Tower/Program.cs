@@ -78,6 +78,7 @@ internal sealed class Program
             };
 
             services
+                .AddScoped<BotDatabaseManager>()
                 .AddSingleton(discordSocketConfig)
                 .AddSingleton<DiscordSocketClient>()
                 .AddSingleton<DiscordLogHandler>()
