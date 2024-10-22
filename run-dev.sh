@@ -1,8 +1,9 @@
 #!/bin/bash
 
-export SQL_SERVER_PORT=$(dotnet user-secrets list -p Tower/ | grep "SqlServerPort" | awk -F' = ' '{print $2}')
-export SQL_SERVER_PASSWORD=$(dotnet user-secrets list -p Tower/ | grep "SqlServerPassword" | awk -F' = ' '{print $2}')
-export DISCORD_TOKEN=$(dotnet user-secrets list -p Tower/ | grep "DiscordToken" | awk -F' = ' '{print $2}')
+secrets=$(dotnet user-secrets list -p Tower/)
+export SQL_SERVER_PORT=$(echo "$secrets" | grep "SqlServerPort" | awk -F' = ' '{print $2}')
+export SQL_SERVER_PASSWORD=$(echo "$secrets" | grep "SqlServerPassword" | awk -F' = ' '{print $2}')
+export DISCORD_TOKEN=$(echo "$secrets" | grep "DiscordToken" | awk -F' = ' '{print $2}')
 
 
 nohup dotnet run --project ~/Documents/tower-server/AntivirusServer > antivirus.log 2>&1 &
