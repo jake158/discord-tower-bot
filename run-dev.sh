@@ -1,24 +1,25 @@
 #!/bin/bash
 
+export SQL_SERVER_PORT=$(dotnet user-secrets list -p Tower/ | grep "SqlServerPort" | awk -F' = ' '{print $2}')
+export SQL_SERVER_PASSWORD=$(dotnet user-secrets list -p Tower/ | grep "SqlServerPassword" | awk -F' = ' '{print $2}')
+export DISCORD_TOKEN=$(dotnet user-secrets list -p Tower/ | grep "DiscordToken" | awk -F' = ' '{print $2}')
+
+
 nohup dotnet run --project ~/Documents/tower-server/AntivirusServer > antivirus.log 2>&1 &
 TOWERPIPE_PID=$!
 
 cleanup() {
     echo "Shutting down towerpipe..."
-    kill $TOWERPIPE_PID
+    kill $TOWERPIPE_PID 2>/dev/null
 
     echo "Stopping containers..."
-    docker compose stop
-    cd ..
+    docker compose -f docker-compose.dev.yml stop 
 }
-trap cleanup SIGINT
+trap cleanup SIGINT SIGTERM EXIT
 
-export SQL_SERVER_PASSWORD=$(dotnet user-secrets list -p Tower/ | grep "ConnectionStrings:SqlServerPassword" | awk -F' = ' '{print $2}')
+docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml up -d sqlserver
+docker compose -f docker-compose.dev.yml up bot --build &
+DOCKER_BOT_PID=$!
 
-docker compose up -d
-
-cd Tower/
-
-dotnet ef database update
-dotnet run --environment Development
-wait
+wait $DOCKER_BOT_PID

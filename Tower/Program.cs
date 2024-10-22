@@ -26,9 +26,11 @@ internal sealed class Program
             var env = context.HostingEnvironment;
             Console.WriteLine($"Running in environment: {env.EnvironmentName}");
 
+            config.AddEnvironmentVariables();
+
             if (env.IsDevelopment())
             {
-                config.AddUserSecrets<Program>();
+                config.AddUserSecrets<Program>(true);
             }
 
             // if (env.IsProduction())
@@ -46,9 +48,14 @@ internal sealed class Program
             services.AddDbContext<TowerDbContext>(options =>
             {
                 var connectionString = config.GetConnectionString("DefaultConnection");
+                var password = config["SqlServerPassword"] ?? Environment.GetEnvironmentVariable("SQL_SERVER_PASSWORD");
+                var sqlServerHost = Environment.GetEnvironmentVariable("SQL_SERVER_HOST") ?? "localhost";
+                var sqlServerPort = config["SqlServerPort"] ?? Environment.GetEnvironmentVariable("SQL_SERVER_PORT") ?? "1433";
+
                 var conStrBuilder = new SqlConnectionStringBuilder(connectionString)
                 {
-                    Password = config["ConnectionStrings:SqlServerPassword"]
+                    Password = password,
+                    DataSource = $"{sqlServerHost},{sqlServerPort}"
                 };
                 var connection = conStrBuilder.ConnectionString;
 
@@ -61,7 +68,8 @@ internal sealed class Program
 
             services
                 .AddSingleton<IAntivirusScanQueue>(new AntivirusScanQueue(antivirusQueueCapacity))
-                .AddSingleton<FileScanner>()
+                // TODO: Dockerize
+                // .AddSingleton<FileScanner>()
                 .AddSingleton<URLScanner>();
 
             services.AddHostedService<AntivirusService>();
@@ -91,10 +99,15 @@ internal sealed class Program
 
             services
                 .AddOptions<BotService.Settings>()
-                .Bind(config.GetRequiredSection("Discord"));
+                .Configure<IConfiguration>((settings, config) =>
+                {
+                    var token = config["DiscordToken"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
+                    ArgumentNullException.ThrowIfNull(token, nameof(token));
+                    settings.Token = token;
+                    settings.TestGuildID = config.GetValue<ulong?>("Discord:TestGuildID");
+                });
 
             services.AddHostedService<BotService>();
-
         })
         .ConfigureLogging(logging =>
         {
@@ -102,6 +115,12 @@ internal sealed class Program
             logging.AddConsole();
         })
         .Build();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TowerDbContext>();
+            db.Database.Migrate();
+        }
 
         await host.RunAsync();
     }

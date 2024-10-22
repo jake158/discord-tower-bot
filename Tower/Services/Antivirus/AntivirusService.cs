@@ -7,14 +7,15 @@ public class AntivirusService : BackgroundService
 {
     private readonly ILogger<AntivirusService> _logger;
     private readonly IAntivirusScanQueue _scanQueue;
-    private readonly FileScanner _fileScanner;
+    // private readonly FileScanner _fileScanner;
     private readonly URLScanner _urlScanner;
 
-    public AntivirusService(ILogger<AntivirusService> logger, IAntivirusScanQueue scanQueue, FileScanner fileScanner, URLScanner urlScanner)
+    // public AntivirusService(ILogger<AntivirusService> logger, IAntivirusScanQueue scanQueue, FileScanner fileScanner, URLScanner urlScanner)
+    public AntivirusService(ILogger<AntivirusService> logger, IAntivirusScanQueue scanQueue, URLScanner urlScanner)
     {
         _logger = logger;
         _scanQueue = scanQueue;
-        _fileScanner = fileScanner;
+        // _fileScanner = fileScanner;
         _urlScanner = urlScanner;
     }
 
@@ -49,7 +50,9 @@ public class AntivirusService : BackgroundService
         if (request.IsFile == true || (request.IsFile == null && request.Url.IsFile))
         {
             _logger.LogInformation($"URL is a file: {request.Url.AbsoluteUri}");
-            return await _fileScanner.ScanFileAtUrlAsync(request.Url, cancellationToken);
+            // TODO: Dockerize
+            // return await _fileScanner.ScanFileAtUrlAsync(request.Url, cancellationToken);
+            return new ScanResult(request.Url.AbsoluteUri, false, false);
         }
         else
         {
