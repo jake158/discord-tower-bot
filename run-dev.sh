@@ -6,12 +6,12 @@ export SQL_SERVER_PASSWORD=$(echo "$secrets" | grep "SqlServerPassword" | awk -F
 export DISCORD_TOKEN=$(echo "$secrets" | grep "DiscordToken" | awk -F' = ' '{print $2}')
 
 
-nohup dotnet run --project ~/Documents/tower-server/AntivirusServer > antivirus.log 2>&1 &
-TOWERPIPE_PID=$!
+python3 mock_server.py &
+ANTIVIRUS_SERVER_PID=$!
 
 cleanup() {
     echo "Shutting down towerpipe..."
-    kill $TOWERPIPE_PID 2>/dev/null
+    kill $ANTIVIRUS_SERVER_PID 2>/dev/null
 
     echo "Stopping containers..."
     docker compose -f docker-compose.dev.yml stop 
