@@ -68,8 +68,7 @@ internal sealed class Program
 
             services
                 .AddSingleton<IAntivirusScanQueue>(new AntivirusScanQueue(antivirusQueueCapacity))
-                // TODO: Dockerize
-                // .AddSingleton<FileScanner>()
+                .AddSingleton<FileScanner>()
                 .AddSingleton<URLScanner>();
 
             services.AddHostedService<AntivirusService>();
@@ -98,7 +97,8 @@ internal sealed class Program
                 });
 
             services
-                .AddOptions<BotService.Settings>()
+                .Configure<FileScanner.FileScannerOptions>(config.GetSection("AntivirusServer"))
+                .AddOptions<BotService.BotServiceOptions>()
                 .Configure<IConfiguration>((settings, config) =>
                 {
                     var token = config["DiscordToken"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
