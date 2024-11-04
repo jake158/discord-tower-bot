@@ -31,7 +31,7 @@ public class MessageHandler
 
         _logger.LogDebug($"Processing attachments/links...");
 
-        int numberOfScans = await PerformScanAsync(scope, message);
+        int numberOfScans = QueueScans(message);
 
 
         if (numberOfScans > 0 && message.Channel is SocketGuildChannel guildChannel)
@@ -53,7 +53,7 @@ public class MessageHandler
         return from Match m in linkParser.Matches(content) select m.Value;
     }
 
-    private async Task<int> PerformScanAsync(IServiceScope scope, SocketUserMessage message)
+    private int QueueScans(SocketUserMessage message)
     {
         int numberOfScans = 0;
         var tasks = new List<Task>();
@@ -61,7 +61,7 @@ public class MessageHandler
         foreach (IAttachment attachment in message.Attachments)
         {
             numberOfScans++;
-            tasks.Add(ProcessLinkAsync(scope, message, new Uri(attachment.Url), true));
+            tasks.Add(ProcessLinkAsync(message, new Uri(attachment.Url), true));
         }
 
         foreach (var link in ExtractLinks(message.Content))
@@ -69,7 +69,7 @@ public class MessageHandler
             try
             {
                 numberOfScans++;
-                tasks.Add(ProcessLinkAsync(scope, message, new Uri(link), false));
+                tasks.Add(ProcessLinkAsync(message, new Uri(link), false));
             }
             catch (UriFormatException)
             {
@@ -77,11 +77,12 @@ public class MessageHandler
             }
         }
 
-        await Task.WhenAll(tasks);
+        // Fire and forget scans
+        _ = Task.WhenAll(tasks);
         return numberOfScans;
     }
 
-    private async Task ProcessLinkAsync(IServiceScope scope, SocketUserMessage message, Uri link, bool forceFile)
+    private async Task ProcessLinkAsync(SocketUserMessage message, Uri link, bool forceFile)
     {
         try
         {
@@ -92,7 +93,7 @@ public class MessageHandler
 
             if (scanResult.IsMalware || scanResult.IsSuspicious)
             {
-                await HandleMalwareFoundAsync(scope, message, scanResult);
+                await HandleMalwareFoundAsync(message, scanResult);
             }
         }
         catch (Exception ex)
@@ -101,11 +102,12 @@ public class MessageHandler
         }
     }
 
-    private async Task HandleMalwareFoundAsync(IServiceScope scope, SocketUserMessage message, ScanResult scanResult)
+    private async Task HandleMalwareFoundAsync(SocketUserMessage message, ScanResult scanResult)
     {
         _logger.LogInformation($"Malware found in {scanResult.Name}");
         await message.ReplyAsync($"Malware found in ${scanResult.Name}");
 
+        using var scope = _scopeFactory.CreateScope();
         var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();
 
         if (message.Channel is not SocketGuildChannel guildChannel)
