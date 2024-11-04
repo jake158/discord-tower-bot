@@ -14,6 +14,8 @@ services:
     restart: always
     networks:
       - app-network
+    volumes:
+      - 'C:\SharedTemp:/tmp'
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2019-latest
