@@ -15,8 +15,7 @@ internal sealed class BotService : IHostedService
     private readonly MessageHandler _messageHandler;
     private readonly InteractionService _interactionService;
     private readonly IServiceProvider _services;
-    private readonly string _token;
-    private readonly ulong? _testGuildID;
+    private readonly BotServiceOptions _options;
     private readonly Assembly _currentAssembly;
     private readonly ILogger<BotService> _logger;
 
@@ -26,7 +25,7 @@ internal sealed class BotService : IHostedService
         MessageHandler messageHandler,
         InteractionService interactionService,
         IServiceProvider services,
-        IOptions<Settings> options,
+        IOptions<BotServiceOptions> options,
         ILogger<BotService> logger)
     {
         _client = client;
@@ -34,10 +33,17 @@ internal sealed class BotService : IHostedService
         _messageHandler = messageHandler;
         _interactionService = interactionService;
         _services = services;
-        _token = options.Value.Token;
-        _testGuildID = options.Value.TestGuildID;
+        _options = options.Value;
         _currentAssembly = Assembly.GetExecutingAssembly();
         _logger = logger;
+    }
+
+    public class BotServiceOptions
+    {
+        [Required]
+        public string Token { get; set; } = "";
+
+        public ulong? TestGuildID { get; set; } = null;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -56,10 +62,10 @@ internal sealed class BotService : IHostedService
         {
             _logger.LogInformation($"WebSocket connection established. Latency: {_client.Latency} ms");
 
-            if (_testGuildID != null)
+            if (_options.TestGuildID != null)
             {
-                _logger.LogInformation($"Registering commands into guild with ID: {_testGuildID}...");
-                await _interactionService.RegisterCommandsToGuildAsync((ulong)_testGuildID);
+                _logger.LogInformation($"Registering commands into guild with ID: {_options.TestGuildID}...");
+                await _interactionService.RegisterCommandsToGuildAsync((ulong)_options.TestGuildID);
             }
             else
             {
@@ -73,7 +79,7 @@ internal sealed class BotService : IHostedService
 
         await _interactionService.AddModulesAsync(_currentAssembly, _services);
 
-        await _client.LoginAsync(TokenType.Bot, _token);
+        await _client.LoginAsync(TokenType.Bot, _options.Token);
         await _client.StartAsync();
 
         _logger.LogInformation("Tower has started");
@@ -95,13 +101,5 @@ internal sealed class BotService : IHostedService
         await _client.StopAsync();
 
         _logger.LogInformation("Tower has stopped");
-    }
-
-    public class Settings
-    {
-        [Required]
-        public string Token { get; set; } = "";
-
-        public ulong? TestGuildID { get; set; } = null;
     }
 }
