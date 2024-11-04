@@ -29,53 +29,12 @@ public class MessageHandler
         using var scope = _scopeFactory.CreateScope();
         var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();
 
-        _logger.LogDebug($"Scope initialized for message: {message}. Processing attachments/links...");
+        _logger.LogDebug($"Processing attachments/links...");
 
-        int numberOfScans = 0;
+        int numberOfScans = await PerformScanAsync(scope, message);
 
-        foreach (IAttachment attachment in message.Attachments)
-        {
-            _logger.LogDebug($"Enqueuing attachment for scanning: {attachment.Url}");
 
-            var scanTask = await _scanQueue.QueueScanAsync(new Uri(attachment.Url), true);
-            var scanResult = await scanTask;
-            numberOfScans++;
-
-            _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
-
-            if (scanResult.IsMalware || scanResult.IsSuspicious)
-            {
-                OnMalwareFoundAsync(dbManager, scanResult, message);
-            }
-        }
-
-        var linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        var links = from Match m in linkParser.Matches(message.Content) select m.Value;
-
-        foreach (var link in links)
-        {
-            try
-            {
-                _logger.LogDebug($"Enqueuing URL for scanning: {link}");
-
-                var scanTask = await _scanQueue.QueueScanAsync(new Uri(link));
-                var scanResult = await scanTask;
-                numberOfScans++;
-
-                _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
-
-                if (scanResult.IsMalware || scanResult.IsSuspicious)
-                {
-                    OnMalwareFoundAsync(dbManager, scanResult, message);
-                }
-            }
-            catch (UriFormatException)
-            {
-                _logger.LogError($"Not a valid URL: {link}");
-            }
-        }
-
-        if (message.Channel is SocketGuildChannel guildChannel && numberOfScans > 0)
+        if (numberOfScans > 0 && message.Channel is SocketGuildChannel guildChannel)
         {
             _logger.LogDebug($"Updating guild stats for message {message}...");
             await dbManager.UpdateGuildStatsAsync(guildChannel.Guild, numberOfScans);
@@ -88,10 +47,66 @@ public class MessageHandler
         _logger.LogDebug($"Message {message} processed");
     }
 
-    private async void OnMalwareFoundAsync(BotDatabaseManager dbManager, ScanResult scanResult, SocketUserMessage message)
+    private static IEnumerable<string> ExtractLinks(string content)
+    {
+        var linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        return from Match m in linkParser.Matches(content) select m.Value;
+    }
+
+    private async Task<int> PerformScanAsync(IServiceScope scope, SocketUserMessage message)
+    {
+        int numberOfScans = 0;
+        var tasks = new List<Task>();
+
+        foreach (IAttachment attachment in message.Attachments)
+        {
+            numberOfScans++;
+            tasks.Add(ProcessLinkAsync(scope, message, new Uri(attachment.Url), true));
+        }
+
+        foreach (var link in ExtractLinks(message.Content))
+        {
+            try
+            {
+                numberOfScans++;
+                tasks.Add(ProcessLinkAsync(scope, message, new Uri(link), false));
+            }
+            catch (UriFormatException)
+            {
+                _logger.LogError($"Not a valid URI: {link}");
+            }
+        }
+
+        await Task.WhenAll(tasks);
+        return numberOfScans;
+    }
+
+    private async Task ProcessLinkAsync(IServiceScope scope, SocketUserMessage message, Uri link, bool forceFile)
+    {
+        try
+        {
+            var scanTask = await _scanQueue.QueueScanAsync(link, forceFile);
+            var scanResult = await scanTask;
+
+            _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
+
+            if (scanResult.IsMalware || scanResult.IsSuspicious)
+            {
+                await HandleMalwareFoundAsync(scope, message, scanResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error scanning link {link}: {ex.Message}");
+        }
+    }
+
+    private async Task HandleMalwareFoundAsync(IServiceScope scope, SocketUserMessage message, ScanResult scanResult)
     {
         _logger.LogInformation($"Malware found in {scanResult.Name}");
         await message.ReplyAsync($"Malware found in ${scanResult.Name}");
+
+        var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();
 
         if (message.Channel is not SocketGuildChannel guildChannel)
         {
@@ -103,9 +118,9 @@ public class MessageHandler
         {
             _logger.LogError($"Could not get guild settings for Guild {guildChannel.Guild.Id}");
         }
-        
-        if (guildSettings?.AlertChannel != null 
-        && guildChannel.Guild.GetTextChannel((ulong) guildSettings.AlertChannel) is SocketTextChannel alertChannel)
+
+        if (guildSettings?.AlertChannel != null
+        && guildChannel.Guild.GetTextChannel((ulong)guildSettings.AlertChannel) is SocketTextChannel alertChannel)
         {
             await alertChannel.SendMessageAsync($"Warning! Malware sent in channel #{guildChannel.Name}");
         }
