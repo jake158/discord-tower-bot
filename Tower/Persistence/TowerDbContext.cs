@@ -10,6 +10,7 @@ public class TowerDbContext : DbContext
     public DbSet<GuildEntity> Guilds { get; set; } = null!;
     public DbSet<GuildStatsEntity> GuildStats { get; set; } = null!;
     public DbSet<GuildSettingsEntity> GuildSettings { get; set; } = null!;
+    public DbSet<ScannedLinkEntity> ScannedLinks { get; set; } = null!;
 
     public TowerDbContext(DbContextOptions<TowerDbContext> options)
         : base(options)
