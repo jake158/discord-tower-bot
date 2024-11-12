@@ -68,8 +68,18 @@ internal sealed class Program
 
             services
                 .AddSingleton<IAntivirusScanQueue>(new AntivirusScanQueue(antivirusQueueCapacity))
+                .AddScoped<ScanResultCache>()
                 .AddSingleton<FileScanner>()
                 .AddSingleton<URLScanner>();
+
+            // services
+            //     .AddOptions<URLScanner.URLScannerOptions>()
+            //     .Configure<IConfiguration>((options, config) =>
+            //     {
+            //         var googleApiKey = config["GoogleApiKey"] ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+            //         ArgumentNullException.ThrowIfNull(googleApiKey, nameof(googleApiKey));
+            //         options.GoogleApiKey = googleApiKey;
+            //     });
 
             services.AddHostedService<AntivirusService>();
 
@@ -99,12 +109,12 @@ internal sealed class Program
             services
                 .Configure<FileScanner.FileScannerOptions>(config.GetSection("AntivirusServer"))
                 .AddOptions<BotService.BotServiceOptions>()
-                .Configure<IConfiguration>((settings, config) =>
+                .Configure<IConfiguration>((options, config) =>
                 {
                     var token = config["DiscordToken"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
                     ArgumentNullException.ThrowIfNull(token, nameof(token));
-                    settings.Token = token;
-                    settings.TestGuildID = config.GetValue<ulong?>("Discord:TestGuildID");
+                    options.Token = token;
+                    options.TestGuildID = config.GetValue<ulong?>("Discord:TestGuildID");
                 });
 
             services.AddHostedService<BotService>();

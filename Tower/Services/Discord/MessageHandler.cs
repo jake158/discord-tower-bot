@@ -89,7 +89,7 @@ public class MessageHandler
             var scanTask = await _scanQueue.QueueScanAsync(link, forceFile);
             var scanResult = await scanTask;
 
-            _logger.LogDebug($"Scan result: {scanResult.Name}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}");
+            _logger.LogDebug($"Scan result: {scanResult.Link}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}, ScannedLinkId: ${scanResult.ScannedLinkId}");
 
             if (scanResult.IsMalware || scanResult.IsSuspicious)
             {
@@ -104,8 +104,8 @@ public class MessageHandler
 
     private async Task HandleMalwareFoundAsync(SocketUserMessage message, ScanResult scanResult)
     {
-        _logger.LogInformation($"Malware found in {scanResult.Name}");
-        await message.ReplyAsync($"Malware found in ${scanResult.Name}");
+        _logger.LogInformation($"Malware found in {scanResult.Link}");
+        await message.ReplyAsync($"Malware found in ${scanResult.Link}");
 
         using var scope = _scopeFactory.CreateScope();
         var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();

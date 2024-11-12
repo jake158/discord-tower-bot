@@ -1,17 +1,25 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using Tower.Services.Antivirus.Models;
+using Tower.Persistence.Entities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tower.Services.Antivirus;
 public class FileScanner
 {
     private readonly ILogger<FileScanner> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly FileScannerOptions _options;
 
-    public FileScanner(ILogger<FileScanner> logger, IOptions<FileScannerOptions> options)
+    public FileScanner(
+        ILogger<FileScanner> logger,
+        IServiceScopeFactory scopeFactory,
+        IOptions<FileScannerOptions> options)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
         _options = options.Value;
     }
 
@@ -22,18 +30,58 @@ public class FileScanner
         public string SharedDirectory { get; set; } = "/tmp";
     }
 
+    private static string CalculateMD5(string filePath)
+    {
+        using var md5 = MD5.Create();
+        using var stream = File.OpenRead(filePath);
+        var hashBytes = md5.ComputeHash(stream);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
     public async Task<ScanResult> ScanFileAtUrlAsync(Uri fileUri, CancellationToken cancellationToken)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var cache = scope.ServiceProvider.GetRequiredService<ScanResultCache>();
+
+        var cachedResult = await cache.GetScanResultAsync(fileUri, ResourceType.File);
+
+        if (cachedResult != null)
+        {
+            _logger.LogInformation($"Cache hit for file: {fileUri.AbsoluteUri}");
+            return (ScanResult)cachedResult;
+        }
+
         _logger.LogInformation($"Downloading file from URL: {fileUri.AbsoluteUri}");
 
         string filePath = await DownloadFileAsync(fileUri, cancellationToken);
 
-        _logger.LogInformation($"File downloaded to {filePath}, starting scan...");
+        _logger.LogDebug($"File downloaded to {filePath}");
 
         try
         {
-            var result = await DoAntivirusScanAsync(filePath);
-            return result;
+            string md5Hash = CalculateMD5(filePath);
+
+            _logger.LogDebug($"MD5 hash calculated: {md5Hash}");
+
+            var md5CachedResult = await cache.GetScanResultAsync(fileUri, ResourceType.File, md5Hash);
+
+            if (md5CachedResult != null)
+            {
+                _logger.LogInformation($"Cache hit for file: {fileUri.AbsoluteUri}");
+                return (ScanResult)md5CachedResult;
+            }
+
+            _logger.LogInformation($"Cache miss for file: {fileUri.AbsoluteUri}, starting scan...");
+
+            bool isMalware = await DoAntivirusScanAsync(filePath, cancellationToken);
+
+            return await cache.SaveScanResultAsync(
+                url: fileUri,
+                type: ResourceType.File,
+                isMalware: isMalware,
+                isSuspicious: false,
+                md5Hash: md5Hash
+            );
         }
         finally
         {
@@ -46,52 +94,44 @@ public class FileScanner
         var tempDirectory = _options.SharedDirectory;
 
         Directory.CreateDirectory(tempDirectory);
-        var fileName = Path.GetFileName(fileUri.LocalPath);
+
+        var fileName = Guid.NewGuid().ToString();
         var filePath = Path.Combine(tempDirectory, fileName);
 
-        using HttpClient client = new();
-        var response = await client.GetAsync(fileUri, cancellationToken);
+        using var httpClient = new HttpClient();
+        var response = await httpClient.GetAsync(fileUri, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        await using var fs = new FileStream(filePath, FileMode.Create);
+        await using var fs = new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         await response.Content.CopyToAsync(fs, cancellationToken);
 
         return filePath;
     }
 
-    private async Task<ScanResult> DoAntivirusScanAsync(string filePath)
+    private async Task<bool> DoAntivirusScanAsync(string filePath, CancellationToken cancellationToken)
     {
-        var scanResult = new ScanResult(filePath, isMalware: false, isSuspicious: false);
+        using var tcpClient = new TcpClient();
+        await tcpClient.ConnectAsync(_options.Address, _options.Port, cancellationToken);
 
-        using (var tcpClient = new TcpClient())
+        using var stream = tcpClient.GetStream();
+        using var writer = new StreamWriter(stream) { AutoFlush = true };
+        using var reader = new StreamReader(stream);
+
+        var fileName = Path.GetFileName(filePath);
+
+        _logger.LogInformation($"Sending file {fileName} for antivirus scanning.");
+
+        await writer.WriteLineAsync(fileName);
+
+        var response = await reader.ReadLineAsync();
+        if (string.IsNullOrEmpty(response))
         {
-            await tcpClient.ConnectAsync(_options.Address, _options.Port);
-
-            using var stream = tcpClient.GetStream();
-            using var writer = new StreamWriter(stream) { AutoFlush = true };
-            using var reader = new StreamReader(stream);
-
-            var fileName = Path.GetFileName(filePath);
-
-            _logger.LogInformation($"Sending file {fileName} for antivirus scanning.");
-
-            await writer.WriteLineAsync(fileName);
-
-            var response = await reader.ReadLineAsync();
-            if (string.IsNullOrEmpty(response))
-            {
-                throw new InvalidOperationException("Received an empty response from the antivirus server.");
-            }
-
-            _logger.LogInformation($"Received response from antivirus server: {response}");
-
-            if (response.Contains("DETECTED THREATS"))
-            {
-                scanResult = new ScanResult(filePath, isMalware: true, isSuspicious: false);
-            }
+            throw new InvalidOperationException("Received an empty response from the antivirus server");
         }
 
-        return scanResult;
+        _logger.LogInformation($"Received response from antivirus server: {response}");
+
+        bool isMalware = response.Contains("DETECTED THREATS");
+        return isMalware;
     }
 }
-
