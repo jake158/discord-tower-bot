@@ -26,10 +26,9 @@ public class AntivirusService : BackgroundService
         {
             ScanRequest request = await _scanQueue.DequeueAsync(cancellationToken);
 
-            ScanResult result;
             try
             {
-                result = await ProcessScanRequestAsync(request, cancellationToken);
+                ScanResult result = await ProcessScanRequestAsync(request, cancellationToken);
                 request.TaskCompletionSource.SetResult(result);
             }
             catch (Exception ex)
@@ -45,6 +44,12 @@ public class AntivirusService : BackgroundService
     private async Task<ScanResult> ProcessScanRequestAsync(ScanRequest request, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Processing ScanRequest: {request.Url.AbsoluteUri}");
+
+        if (!(request.Url.Scheme == Uri.UriSchemeHttp || request.Url.Scheme == Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException($"Not a valid Http/Https URL: {request.Url.AbsoluteUri}");
+        }
+        // TODO: Requesting header to see if downloadable or not
 
         if (request.IsFile == true || (request.IsFile == null && request.Url.IsFile))
         {
