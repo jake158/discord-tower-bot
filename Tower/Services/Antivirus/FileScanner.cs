@@ -25,8 +25,8 @@ public class FileScanner
 
     public class FileScannerOptions
     {
-        public string Address { get; set; } = "localhost";
-        public int Port { get; set; } = 5000;
+        public string AntivirusServerHost { get; set; } = "localhost";
+        public int AntivirusServerPort { get; set; } = 5000;
         public string SharedDirectory { get; set; } = "/tmp";
     }
 
@@ -111,7 +111,12 @@ public class FileScanner
     private async Task<bool> DoAntivirusScanAsync(string filePath, CancellationToken cancellationToken)
     {
         using var tcpClient = new TcpClient();
-        await tcpClient.ConnectAsync(_options.Address, _options.Port, cancellationToken);
+
+        await tcpClient.ConnectAsync(
+            _options.AntivirusServerHost,
+            _options.AntivirusServerPort,
+            cancellationToken
+            );
 
         using var stream = tcpClient.GetStream();
         using var writer = new StreamWriter(stream) { AutoFlush = true };

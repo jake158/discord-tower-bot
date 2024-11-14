@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Channels;
+using Microsoft.Extensions.Options;
 using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
@@ -6,18 +8,21 @@ public class AntivirusScanQueue : IAntivirusScanQueue
 {
     private readonly Channel<ScanRequest> _queue;
 
-    public AntivirusScanQueue(int capacity = 2)
+    public AntivirusScanQueue(IOptions<AntivirusScanQueueOptions> options)
     {
-        // Capacity should be set based on the expected application load and
-        // number of concurrent threads accessing the queue.            
-        // BoundedChannelFullMode.Wait will cause calls to WriteAsync() to return a task,
-        // which completes only when space became available. This leads to backpressure,
-        // in case too many publishers/calls start accumulating.
-        var options = new BoundedChannelOptions(capacity)
+        var capacity = options.Value.Capacity;
+
+        var boundedChannelOptions = new BoundedChannelOptions(capacity)
         {
             FullMode = BoundedChannelFullMode.Wait
         };
-        _queue = Channel.CreateBounded<ScanRequest>(options);
+        _queue = Channel.CreateBounded<ScanRequest>(boundedChannelOptions);
+    }
+
+    public class AntivirusScanQueueOptions
+    {
+        [Required]
+        public int Capacity { get; set; } = 5;
     }
 
     public async Task<Task<ScanResult>> QueueScanAsync(Uri url, bool? isFile = null)
