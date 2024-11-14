@@ -9,7 +9,9 @@ services:
       - SQL_SERVER_PASSWORD=${SQL_SERVER_PASSWORD}
       - SQL_SERVER_HOST=sqlserver
       - SQL_SERVER_PORT=1433
+      - ANTIVIRUS_SERVER_HOST=host.docker.internal
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON}
     depends_on:
       - sqlserver
     entrypoint: ["./wait-for-it.sh", "sqlserver:1433", "-t", "120", "--", "sh", "-c", "dotnet Tower.dll --environment Development"]

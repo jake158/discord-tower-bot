@@ -4,10 +4,9 @@ services:
     image: ${DOCKER_REGISTRY}tower:${DOCKER_TAG:-latest}
     container_name: bot
     environment:
-      - SQL_SERVER_PASSWORD=${SQL_SERVER_PASSWORD}
       - SQL_SERVER_HOST=sqlserver
       - SQL_SERVER_PORT=1433
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - ANTIVIRUS_SERVER_HOST=host.docker.internal
     depends_on:
       - sqlserver
     entrypoint: ["./wait-for-it.sh", "sqlserver:1433", "-t", "120", "--", "sh", "-c", "dotnet Tower.dll --environment Production"]
