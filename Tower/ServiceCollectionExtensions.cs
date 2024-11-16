@@ -85,7 +85,8 @@ public static class ServiceCollectionExtensions
 
         var interactionServiceConfig = new InteractionServiceConfig
         {
-            UseCompiledLambda = true
+            UseCompiledLambda = true,
+            AutoServiceScopes = true
         };
 
         services

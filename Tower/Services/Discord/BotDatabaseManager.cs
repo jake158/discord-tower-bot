@@ -107,10 +107,19 @@ public class BotDatabaseManager
         await _db.SaveChangesAsync();
     }
 
-    public async Task<GuildSettingsEntity> GetGuildSettingsAsync(SocketGuild guild, bool asTracking = false)
+    public async Task<GuildSettingsEntity> GetGuildSettingsAsync(SocketGuild guild)
     {
-        var guildEntity = await EnsureGuildExistsAsync(guild, asTracking);
+        var guildEntity = await EnsureGuildExistsAsync(guild, false);
         return guildEntity.Settings;
+    }
+
+    public async Task SaveGuildSettingsAsync(GuildSettingsEntity guildSettings)
+    {
+        _db.Attach(guildSettings);
+        _db.Entry(guildSettings).State = EntityState.Modified;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation($"Guild settings updated for GuildId: {guildSettings.GuildId}");
     }
 
     public async Task AddUserOffenseAsync(SocketUser user, string link, int scannedLinkId, SocketGuild? guild)
