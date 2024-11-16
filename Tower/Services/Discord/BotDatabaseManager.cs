@@ -16,9 +16,9 @@ public class BotDatabaseManager
         _db = db;
     }
 
-    private async Task<UserEntity> EnsureUserExistsAsync(ulong userId)
+    private async Task<UserEntity> EnsureUserExistsAsync(ulong userId, bool asTracking = true)
     {
-        var userEntity = await _db.Users
+        var userEntity = await (asTracking ? _db.Users : _db.Users.AsNoTracking())
             .Include(u => u.Stats)
             .SingleOrDefaultAsync(u => u.UserId == userId);
 
@@ -37,9 +37,9 @@ public class BotDatabaseManager
         return userEntity;
     }
 
-    private async Task<GuildEntity> EnsureGuildExistsAsync(SocketGuild guild)
+    private async Task<GuildEntity> EnsureGuildExistsAsync(SocketGuild guild, bool asTracking = true)
     {
-        var guildEntity = await _db.Guilds
+        var guildEntity = await (asTracking ? _db.Guilds : _db.Guilds.AsNoTracking())
             .Include(g => g.Stats)
             .Include(g => g.Settings)
             .SingleOrDefaultAsync(g => g.GuildId == guild.Id);
@@ -66,9 +66,9 @@ public class BotDatabaseManager
         return guildEntity;
     }
 
-    public async Task TrackUserAsync(SocketUser user) => await EnsureUserExistsAsync(user.Id);
+    public async Task TrackUserAsync(SocketUser user) => await EnsureUserExistsAsync(user.Id, asTracking: false);
 
-    public async Task TrackGuildAsync(SocketGuild guild) => await EnsureGuildExistsAsync(guild);
+    public async Task TrackGuildAsync(SocketGuild guild) => await EnsureGuildExistsAsync(guild, asTracking: false);
 
     public async Task UpdateGuildStatsAsync(SocketGuild guild, int numberOfScans, int malwareFoundCount = 0)
     {
@@ -107,24 +107,40 @@ public class BotDatabaseManager
         await _db.SaveChangesAsync();
     }
 
-    public async Task<GuildSettingsEntity> GetGuildSettingsAsync(SocketGuild guild)
+    public async Task<GuildSettingsEntity> GetGuildSettingsAsync(SocketGuild guild, bool asTracking = false)
     {
-        var guildEntity = await EnsureGuildExistsAsync(guild);
+        var guildEntity = await EnsureGuildExistsAsync(guild, asTracking);
         return guildEntity.Settings;
     }
 
     public async Task AddUserOffenseAsync(SocketUser user, string link, int scannedLinkId, SocketGuild? guild)
     {
         _logger.LogInformation($"Adding UserOffense: UserId={user.Id}, GuildId={guild?.Id}, ScannedLinkId={scannedLinkId}, Link={link}");
-        var userEntity = await EnsureUserExistsAsync(user.Id);
 
+        var userEntity = await EnsureUserExistsAsync(user.Id);
         await _db.Entry(userEntity).Collection(u => u.Offenses).LoadAsync();
+
+        var existingOffense = await _db.UserOffenses
+                            .AsNoTracking()
+                            .Where(o => o.UserId == user.Id)
+                            .Where(o => o.GuildId == (guild != null ? guild.Id : null))
+                            .Where(o => o.ScannedLinkId == scannedLinkId)
+                            .FirstOrDefaultAsync();
+
+        if (existingOffense != null)
+        {
+            _logger.LogInformation($"UserOffense already exists, returning: UserId={user.Id}, GuildId={guild?.Id}, ScannedLinkId={scannedLinkId}, Link={link}");
+            return;
+        }
+
+        // Trim link to avoid malicious flooding of db with data
+        link = link.Length > 300 ? link[..300] : link;
 
         var userOffense = new UserOffenseEntity()
         {
             UserId = user.Id,
             GuildId = guild?.Id,
-            MaliciousLink = link.Length > 300 ? link[..300] : link,
+            MaliciousLink = link,
             ScannedLinkId = scannedLinkId,
             OffenseDate = DateTime.UtcNow,
         };
