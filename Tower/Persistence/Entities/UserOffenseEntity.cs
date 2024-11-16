@@ -16,6 +16,8 @@ public class UserOffenseEntity
     [ForeignKey(nameof(Guild))]
     public ulong? GuildId { get; set; }
 
+    [StringLength(maximumLength: 300)]
+    public string MaliciousLink { get; set; } = null!;
     public DateTime OffenseDate { get; set; }
 
     public virtual UserEntity User { get; set; } = null!;
