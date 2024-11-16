@@ -1,4 +1,5 @@
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tower.Persistence;
 using Tower.Persistence.Entities;
@@ -15,161 +16,120 @@ public class BotDatabaseManager
         _db = db;
     }
 
-    public async Task TrackUserAsync(SocketUser user)
+    private async Task<UserEntity> EnsureUserExistsAsync(ulong userId)
     {
-        ArgumentNullException.ThrowIfNull(user, nameof(user));
-        _logger.LogInformation($"TrackUser: Tracking user {user.Id}...");
+        var userEntity = await _db.Users
+            .Include(u => u.Stats)
+            .SingleOrDefaultAsync(u => u.UserId == userId);
 
-        var userEntity = await _db.Users.FindAsync(user.Id);
-        if (userEntity != null)
-        {
-            _logger.LogInformation($"TrackUser: User {user.Id} already exists. Skipping.");
-            return;
-        }
+        if (userEntity != null) return userEntity;
 
+        _logger.LogInformation($"Creating new user entity for UserId: {userId}");
         userEntity = new UserEntity
         {
-            UserId = user.Id,
-            Stats = new UserStatsEntity()
-            {
-                UserId = user.Id,
-            }
+            UserId = userId,
+            Stats = new UserStatsEntity { UserId = userId }
         };
 
         _db.Users.Add(userEntity);
         await _db.SaveChangesAsync();
+
+        return userEntity;
     }
 
-    public async Task TrackGuildAsync(SocketGuild guild)
+    private async Task<GuildEntity> EnsureGuildExistsAsync(SocketGuild guild)
     {
-        ArgumentNullException.ThrowIfNull(guild, nameof(guild));
-        _logger.LogInformation($"TrackGuild: Tracking guild {guild.Id}...");
+        var guildEntity = await _db.Guilds
+            .Include(g => g.Stats)
+            .Include(g => g.Settings)
+            .SingleOrDefaultAsync(g => g.GuildId == guild.Id);
 
-        var guildOwnerEntity = await _db.Users.FindAsync(guild.OwnerId);
+        if (guildEntity != null) return guildEntity;
 
-        if (guildOwnerEntity == null)
+        var ownerEntity = await EnsureUserExistsAsync(guild.OwnerId);
+        await _db.Entry(ownerEntity).Collection(u => u.OwnedGuilds).LoadAsync();
+
+        _logger.LogInformation($"Creating new guild entity for GuildId: {guild.Id}");
+        guildEntity = new GuildEntity
         {
-            guildOwnerEntity = new UserEntity()
-            {
-                UserId = guild.OwnerId,
-            };
+            GuildId = guild.Id,
+            UserId = guild.OwnerId,
+            Name = guild.Name,
+            Stats = new GuildStatsEntity { GuildId = guild.Id, JoinDate = DateTime.UtcNow },
+            Settings = new GuildSettingsEntity { GuildId = guild.Id }
+        };
 
-            _db.Users.Add(guildOwnerEntity);
-        } else
-        {
-            _logger.LogInformation($"TrackGuild: Owner for guild {guild.Id} already exists in Users table...");
-        }
-
-        var guildEntity = await _db.Guilds.FindAsync(guild.Id);
-        if (guildEntity == null)
-        {
-            guildEntity = new GuildEntity()
-            {
-                GuildId = guild.Id,
-                UserId = guild.OwnerId,
-                Name = guild.Name,
-                Stats = new GuildStatsEntity()
-                {
-                    GuildId = guild.Id,
-                    JoinDate = DateTime.UtcNow,
-                },
-                Settings = new GuildSettingsEntity()
-                {
-                    GuildId = guild.Id,
-                }
-            };
-
-            guildOwnerEntity.OwnedGuilds.Add(guildEntity);
-        } else {
-            _logger.LogWarning($"TrackGuild is called for guild {guild.Id} but guild already exists in Guilds table");
-        }
+        ownerEntity.OwnedGuilds.Add(guildEntity);
+        _db.Guilds.Add(guildEntity);
         await _db.SaveChangesAsync();
+
+        return guildEntity;
     }
+
+    public async Task TrackUserAsync(SocketUser user) => await EnsureUserExistsAsync(user.Id);
+
+    public async Task TrackGuildAsync(SocketGuild guild) => await EnsureGuildExistsAsync(guild);
 
     public async Task UpdateGuildStatsAsync(SocketGuild guild, int numberOfScans, int malwareFoundCount = 0)
     {
-        ArgumentNullException.ThrowIfNull(guild, nameof(guild));
-        var guildStats = await _db.GuildStats.FindAsync(guild.Id);
-        
-        if (guildStats == null)
+        var guildEntity = await EnsureGuildExistsAsync(guild);
+        var stats = guildEntity.Stats ??= new GuildStatsEntity { GuildId = guild.Id };
+
+        var now = DateTime.UtcNow;
+        if (stats.LastScanDate?.Date == now.AddDays(-1).Date)
         {
-            _logger.LogWarning($"UpdateGuildStats: Guild stats for guild {guild.Id} not found in db");
-
-            await TrackGuildAsync(guild);
-            guildStats = await _db.GuildStats.FindAsync(guild.Id);
-
-            if (guildStats == null)
-            {
-                _logger.LogError($"UpdateGuildStats: Failed to get stats for guild {guild.Id} after calling TrackGuild");
-                return;
-            }
+            stats.ScansToday = 0;
         }
 
-        var dateNow = DateTime.Now;
-        if (guildStats.LastScanDate != null && ((DateTime) guildStats.LastScanDate).Date == dateNow.AddDays(-1).Date)
-        {
-            guildStats.ScansToday = 0;
-        }
-
-        guildStats.TotalScans += numberOfScans;
-        guildStats.ScansToday += numberOfScans;
-        guildStats.MalwareFoundCount += malwareFoundCount;
-        guildStats.LastScanDate = dateNow;
+        stats.TotalScans += numberOfScans;
+        stats.ScansToday += numberOfScans;
+        stats.MalwareFoundCount += malwareFoundCount;
+        stats.LastScanDate = now;
 
         await _db.SaveChangesAsync();
     }
 
     public async Task UpdateUserStatsAsync(SocketUser user, int numberOfScans)
     {
-        ArgumentNullException.ThrowIfNull(user, nameof(user));
-        var userEntity = await _db.Users.FindAsync(user.Id);
-        
-        if (userEntity == null)
-        {
-            _logger.LogInformation($"UpdateUserStats: User stats for user {user.Id} not found in db");
-            
-            await TrackUserAsync(user);
-            userEntity = await _db.Users.FindAsync(user.Id);
+        var userEntity = await EnsureUserExistsAsync(user.Id);
+        var stats = userEntity.Stats ??= new UserStatsEntity { UserId = user.Id };
 
-            if (userEntity == null)
-            {
-                _logger.LogError($"UpdateUserStats: Failed to get entity for user {user.Id} after calling TrackUser");
-                return;
-            }
-        }
-        var userStats = userEntity.Stats ??= new UserStatsEntity() { UserId = user.Id };
-
-        var dateNow = DateTime.Now;
-        if (userStats.LastScanDate != null && ((DateTime) userStats.LastScanDate).Date == dateNow.AddDays(-1).Date)
+        var now = DateTime.UtcNow;
+        if (stats.LastScanDate?.Date == now.AddDays(-1).Date)
         {
-            userStats.ScansToday = 0;
+            stats.ScansToday = 0;
         }
 
-        userStats.TotalScans += numberOfScans;
-        userStats.ScansToday += numberOfScans;
-        userStats.LastScanDate = dateNow;
+        stats.TotalScans += numberOfScans;
+        stats.ScansToday += numberOfScans;
+        stats.LastScanDate = now;
 
-        userEntity.Stats = userStats;
         await _db.SaveChangesAsync();
     }
 
-    public async Task<GuildSettingsEntity?> GetGuildSettingsAsync(SocketGuild guild)
+    public async Task<GuildSettingsEntity> GetGuildSettingsAsync(SocketGuild guild)
     {
-        ArgumentNullException.ThrowIfNull(guild, nameof(guild));
-        var guildSettings = await _db.GuildSettings.FindAsync(guild.Id);
+        var guildEntity = await EnsureGuildExistsAsync(guild);
+        return guildEntity.Settings;
+    }
 
-        if (guildSettings == null)
+    public async Task AddUserOffenseAsync(SocketUser user, string link, int scannedLinkId, SocketGuild? guild)
+    {
+        _logger.LogInformation($"Adding UserOffense: UserId={user.Id}, GuildId={guild?.Id}, ScannedLinkId={scannedLinkId}, Link={link}");
+        var userEntity = await EnsureUserExistsAsync(user.Id);
+
+        await _db.Entry(userEntity).Collection(u => u.Offenses).LoadAsync();
+
+        var userOffense = new UserOffenseEntity()
         {
-            _logger.LogInformation($"GetGuildSettings: Guild settings for guild {guild.Id} not found in db");
+            UserId = user.Id,
+            GuildId = guild?.Id,
+            MaliciousLink = link.Length > 300 ? link[..300] : link,
+            ScannedLinkId = scannedLinkId,
+            OffenseDate = DateTime.UtcNow,
+        };
 
-            await TrackGuildAsync(guild);
-            guildSettings = await _db.GuildSettings.FindAsync(guild.Id);
-
-            if (guildSettings == null)
-            {
-                _logger.LogError($"GetGuildSettings: Failed to get settings for guild {guild.Id} after calling TrackGuild");
-            }
-        }
-        return guildSettings;
+        userEntity.Offenses.Add(userOffense);
+        await _db.SaveChangesAsync();
     }
 }
