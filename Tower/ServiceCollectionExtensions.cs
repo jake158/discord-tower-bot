@@ -93,6 +93,7 @@ public static class ServiceCollectionExtensions
             .AddSingleton(discordSocketConfig)
             .AddSingleton<DiscordSocketClient>()
             .AddSingleton<DiscordLogHandler>()
+            .AddSingleton<MalwareHandler>()
             .AddSingleton<MessageHandler>()
             .AddSingleton<InteractionService>(serviceProvider =>
             {

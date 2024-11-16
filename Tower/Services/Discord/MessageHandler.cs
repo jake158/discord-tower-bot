@@ -4,7 +4,6 @@ using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Tower.Services.Antivirus;
-using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Discord;
 public class MessageHandler
@@ -12,12 +11,14 @@ public class MessageHandler
     private readonly ILogger<MessageHandler> _logger;
     private readonly IAntivirusScanQueue _scanQueue;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly MalwareHandler _malwareHandler;
 
-    public MessageHandler(ILogger<MessageHandler> logger, IAntivirusScanQueue scanQueue, IServiceScopeFactory scopeFactory)
+    public MessageHandler(ILogger<MessageHandler> logger, IAntivirusScanQueue scanQueue, IServiceScopeFactory scopeFactory, MalwareHandler malwareHandler)
     {
         _logger = logger;
         _scanQueue = scanQueue;
         _scopeFactory = scopeFactory;
+        _malwareHandler = malwareHandler;
     }
 
     public async Task HandleMessageAsync(SocketMessage messageParam)
@@ -37,12 +38,20 @@ public class MessageHandler
         if (numberOfScans > 0 && message.Channel is SocketGuildChannel guildChannel)
         {
             _logger.LogDebug($"Updating guild stats for message {message}...");
-            await dbManager.UpdateGuildStatsAsync(guildChannel.Guild, numberOfScans);
+
+            await dbManager.UpdateGuildStatsAsync(
+                guild: guildChannel.Guild,
+                numberOfScans: numberOfScans
+                );
         }
         else if (numberOfScans > 0)
         {
             _logger.LogDebug($"Updating user stats for message {message}...");
-            await dbManager.UpdateUserStatsAsync(message.Author, numberOfScans);
+
+            await dbManager.UpdateUserStatsAsync(
+                user: message.Author,
+                numberOfScans: numberOfScans
+                );
         }
         _logger.LogDebug($"Message {message} processed");
     }
@@ -91,41 +100,18 @@ public class MessageHandler
 
             _logger.LogDebug($"Scan result: {scanResult.Link}, Malware: {scanResult.IsMalware}, Suspicious: {scanResult.IsSuspicious}, ScannedLinkId: ${scanResult.ScannedLinkId}");
 
-            if (scanResult.IsMalware || scanResult.IsSuspicious)
+            if (scanResult.IsMalware)
             {
-                await HandleMalwareFoundAsync(message, scanResult);
+                await _malwareHandler.HandleMalwareFoundAsync(message, scanResult);
+            }
+            else if (scanResult.IsSuspicious)
+            {
+                await _malwareHandler.HandleSuspiciousFoundAsync(message, scanResult);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error scanning link {link}: {ex.Message}");
         }
-    }
-
-    private async Task HandleMalwareFoundAsync(SocketUserMessage message, ScanResult scanResult)
-    {
-        _logger.LogInformation($"Malware found in {scanResult.Link}");
-        await message.ReplyAsync($"Malware found in ${scanResult.Link}");
-
-        using var scope = _scopeFactory.CreateScope();
-        var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();
-
-        if (message.Channel is not SocketGuildChannel guildChannel)
-        {
-            return;
-        }
-        var guildSettings = await dbManager.GetGuildSettingsAsync(guildChannel.Guild);
-
-        if (guildSettings == null)
-        {
-            _logger.LogError($"Could not get guild settings for Guild {guildChannel.Guild.Id}");
-        }
-
-        if (guildSettings?.AlertChannel != null
-        && guildChannel.Guild.GetTextChannel((ulong)guildSettings.AlertChannel) is SocketTextChannel alertChannel)
-        {
-            await alertChannel.SendMessageAsync($"Warning! Malware sent in channel #{guildChannel.Name}");
-        }
-        await dbManager.UpdateGuildStatsAsync(guildChannel.Guild, 0, 1);
     }
 }
