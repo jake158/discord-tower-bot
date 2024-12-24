@@ -3,20 +3,16 @@ using Microsoft.Extensions.Logging;
 using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
-public class AntivirusService : BackgroundService
+public class AntivirusService(
+    ILogger<AntivirusService> logger, 
+    IAntivirusScanQueue scanQueue, 
+    FileScanner fileScanner, 
+    URLScanner urlScanner) : BackgroundService
 {
-    private readonly ILogger<AntivirusService> _logger;
-    private readonly IAntivirusScanQueue _scanQueue;
-    private readonly FileScanner _fileScanner;
-    private readonly URLScanner _urlScanner;
-
-    public AntivirusService(ILogger<AntivirusService> logger, IAntivirusScanQueue scanQueue, FileScanner fileScanner, URLScanner urlScanner)
-    {
-        _logger = logger;
-        _scanQueue = scanQueue;
-        _fileScanner = fileScanner;
-        _urlScanner = urlScanner;
-    }
+    private readonly ILogger<AntivirusService> _logger = logger;
+    private readonly IAntivirusScanQueue _scanQueue = scanQueue;
+    private readonly FileScanner _fileScanner = fileScanner;
+    private readonly URLScanner _urlScanner = urlScanner;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

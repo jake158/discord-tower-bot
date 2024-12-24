@@ -7,16 +7,10 @@ using Tower.Persistence.Entities;
 using Tower.Services.Antivirus.Models;
 
 namespace Tower.Services.Antivirus;
-public class ScanResultCache
+public class ScanResultCache(ILogger<ScanResultCache> logger, TowerDbContext db)
 {
-    private readonly ILogger<ScanResultCache> _logger;
-    private readonly TowerDbContext _db;
-
-    public ScanResultCache(ILogger<ScanResultCache> logger, TowerDbContext db)
-    {
-        _logger = logger;
-        _db = db;
-    }
+    private readonly ILogger<ScanResultCache> _logger = logger;
+    private readonly TowerDbContext _db = db;
 
     private static string HashLink(Uri uri)
     {

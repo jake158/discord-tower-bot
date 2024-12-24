@@ -5,16 +5,10 @@ using Tower.Persistence;
 using Tower.Persistence.Entities;
 
 namespace Tower.Services.Discord;
-public class BotDatabaseManager
+public class BotDatabaseManager(ILogger<BotDatabaseManager> logger, TowerDbContext db)
 {
-    private readonly ILogger<BotDatabaseManager> _logger;
-    private readonly TowerDbContext _db;
-
-    public BotDatabaseManager(ILogger<BotDatabaseManager> logger, TowerDbContext db)
-    {
-        _logger = logger;
-        _db = db;
-    }
+    private readonly ILogger<BotDatabaseManager> _logger = logger;
+    private readonly TowerDbContext _db = db;
 
     private async Task<UserEntity> EnsureUserExistsAsync(ulong userId, bool asTracking = true)
     {

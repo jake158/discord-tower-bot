@@ -6,20 +6,15 @@ using Microsoft.Extensions.Logging;
 using Tower.Services.Antivirus;
 
 namespace Tower.Services.Discord;
-public class MessageHandler
+public partial class MessageHandler(ILogger<MessageHandler> logger, IAntivirusScanQueue scanQueue, IServiceScopeFactory scopeFactory, MalwareHandler malwareHandler)
 {
-    private readonly ILogger<MessageHandler> _logger;
-    private readonly IAntivirusScanQueue _scanQueue;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly MalwareHandler _malwareHandler;
+    private readonly ILogger<MessageHandler> _logger = logger;
+    private readonly IAntivirusScanQueue _scanQueue = scanQueue;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly MalwareHandler _malwareHandler = malwareHandler;
 
-    public MessageHandler(ILogger<MessageHandler> logger, IAntivirusScanQueue scanQueue, IServiceScopeFactory scopeFactory, MalwareHandler malwareHandler)
-    {
-        _logger = logger;
-        _scanQueue = scanQueue;
-        _scopeFactory = scopeFactory;
-        _malwareHandler = malwareHandler;
-    }
+    [GeneratedRegex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.IgnoreCase)]
+    private static partial Regex GetLinkParser();
 
     public async Task HandleMessageAsync(SocketMessage messageParam)
     {
@@ -58,8 +53,7 @@ public class MessageHandler
 
     private static IEnumerable<string> ExtractLinks(string content)
     {
-        var linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        return from Match m in linkParser.Matches(content) select m.Value;
+        return from Match m in GetLinkParser().Matches(content) select m.Value;
     }
 
     private int QueueScans(SocketUserMessage message)

@@ -6,18 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel.DataAnnotations;
 
 namespace Tower.Services.Antivirus;
-public class URLScanner
+public class URLScanner(ILogger<URLScanner> logger, IServiceScopeFactory scopeFactory, WebRiskServiceClient webRiskClient)
 {
-    private readonly ILogger<URLScanner> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly WebRiskServiceClient _webRiskClient;
-
-    public URLScanner(ILogger<URLScanner> logger, IServiceScopeFactory scopeFactory, WebRiskServiceClient webRiskClient)
-    {
-        _logger = logger;
-        _scopeFactory = scopeFactory;
-        _webRiskClient = webRiskClient;
-    }
+    private readonly ILogger<URLScanner> _logger = logger;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly WebRiskServiceClient _webRiskClient = webRiskClient;
 
     public class URLScannerOptions
     {

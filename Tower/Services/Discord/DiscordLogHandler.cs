@@ -2,14 +2,9 @@ using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tower.Services.Discord;
-internal sealed class DiscordLogHandler
+internal sealed class DiscordLogHandler(ILogger<DiscordLogHandler> logger)
 {
-    private readonly ILogger<DiscordLogHandler> _logger;
-
-    public DiscordLogHandler(ILogger<DiscordLogHandler> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<DiscordLogHandler> _logger = logger;
 
     public Task LogAsync(LogMessage message)
     {

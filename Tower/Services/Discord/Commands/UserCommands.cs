@@ -3,14 +3,9 @@ using Discord.Interactions;
 using Discord.WebSocket;
 
 namespace Tower.Services.Discord.Commands;
-public class UserCommands : InteractionModuleBase<SocketInteractionContext>
+public class UserCommands(BotDatabaseManager databaseManager) : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly BotDatabaseManager _dbManager;
-
-    public UserCommands(BotDatabaseManager databaseManager)
-    {
-        _dbManager = databaseManager;
-    }
+    private readonly BotDatabaseManager _dbManager = databaseManager;
 
     [SlashCommand("help", "Learn how to use Tower")]
     public async Task HelpCommandAsync()

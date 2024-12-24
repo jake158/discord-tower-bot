@@ -9,35 +9,23 @@ using Microsoft.Extensions.Options;
 using Tower.Services.Discord.Commands;
 
 namespace Tower.Services.Discord;
-internal sealed class BotService : IHostedService
+internal sealed class BotService(
+    DiscordSocketClient client,
+    DiscordLogHandler discordLogHandler,
+    MessageHandler messageHandler,
+    InteractionService interactionService,
+    IServiceProvider services,
+    IOptions<BotService.BotServiceOptions> options,
+    ILogger<BotService> logger) : IHostedService
 {
-    private readonly DiscordSocketClient _client;
-    private readonly DiscordLogHandler _discordLogHandler;
-    private readonly MessageHandler _messageHandler;
-    private readonly InteractionService _interactionService;
-    private readonly IServiceProvider _services;
-    private readonly BotServiceOptions _options;
-    private readonly Assembly _currentAssembly;
-    private readonly ILogger<BotService> _logger;
-
-    public BotService(
-        DiscordSocketClient client,
-        DiscordLogHandler discordLogHandler,
-        MessageHandler messageHandler,
-        InteractionService interactionService,
-        IServiceProvider services,
-        IOptions<BotServiceOptions> options,
-        ILogger<BotService> logger)
-    {
-        _client = client;
-        _discordLogHandler = discordLogHandler;
-        _messageHandler = messageHandler;
-        _interactionService = interactionService;
-        _services = services;
-        _options = options.Value;
-        _currentAssembly = Assembly.GetExecutingAssembly();
-        _logger = logger;
-    }
+    private readonly DiscordSocketClient _client = client;
+    private readonly DiscordLogHandler _discordLogHandler = discordLogHandler;
+    private readonly MessageHandler _messageHandler = messageHandler;
+    private readonly InteractionService _interactionService = interactionService;
+    private readonly IServiceProvider _services = services;
+    private readonly BotServiceOptions _options = options.Value;
+    private readonly Assembly _currentAssembly = Assembly.GetExecutingAssembly();
+    private readonly ILogger<BotService> _logger = logger;
 
     public class BotServiceOptions
     {

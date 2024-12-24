@@ -3,14 +3,9 @@ using Discord.WebSocket;
 using Tower.Persistence;
 
 namespace Tower.Services.Discord.Commands;
-public class ComponentHandlers : InteractionModuleBase<SocketInteractionContext<SocketMessageComponent>>
+public class ComponentHandlers(TowerDbContext db) : InteractionModuleBase<SocketInteractionContext<SocketMessageComponent>>
 {
-    private readonly TowerDbContext _db;
-
-    public ComponentHandlers(TowerDbContext db)
-    {
-        _db = db;
-    }
+    private readonly TowerDbContext _db = db;
 
     [RequireTeam]
     [ComponentInteraction("statsview:*,*")]

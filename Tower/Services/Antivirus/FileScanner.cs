@@ -7,21 +7,14 @@ using Tower.Persistence.Entities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Tower.Services.Antivirus;
-public class FileScanner
+public class FileScanner(
+    ILogger<FileScanner> logger,
+    IServiceScopeFactory scopeFactory,
+    IOptions<FileScanner.FileScannerOptions> options)
 {
-    private readonly ILogger<FileScanner> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly FileScannerOptions _options;
-
-    public FileScanner(
-        ILogger<FileScanner> logger,
-        IServiceScopeFactory scopeFactory,
-        IOptions<FileScannerOptions> options)
-    {
-        _logger = logger;
-        _scopeFactory = scopeFactory;
-        _options = options.Value;
-    }
+    private readonly ILogger<FileScanner> _logger = logger;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly FileScannerOptions _options = options.Value;
 
     public class FileScannerOptions
     {

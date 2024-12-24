@@ -9,18 +9,14 @@ namespace Tower.Services.Discord.Commands;
 [RequireTeam]
 [Group("admin", "Admin commands")]
 [DontAutoRegister]
-public class AdminCommands : InteractionModuleBase<SocketInteractionContext>
+public class AdminCommands(
+    IHostApplicationLifetime lifetime, 
+    TowerDbContext db, 
+    BotDatabaseManager dbManager) : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly IHostApplicationLifetime _lifetime;
-    private readonly TowerDbContext _db;
-    private readonly BotDatabaseManager _dbManager;
-
-    public AdminCommands(IHostApplicationLifetime lifetime, TowerDbContext db, BotDatabaseManager dbManager)
-    {
-        _lifetime = lifetime;
-        _db = db;
-        _dbManager = dbManager;
-    }
+    private readonly IHostApplicationLifetime _lifetime = lifetime;
+    private readonly TowerDbContext _db = db;
+    private readonly BotDatabaseManager _dbManager = dbManager;
 
     [SlashCommand("shutdown", "Shut down the bot")]
     public async Task ShutdownCommandAsync()
