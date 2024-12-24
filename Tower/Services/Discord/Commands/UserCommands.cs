@@ -2,12 +2,12 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 
-namespace Tower.Services.Discord;
-public class CommandModule : InteractionModuleBase<SocketInteractionContext>
+namespace Tower.Services.Discord.Commands;
+public class UserCommands : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly BotDatabaseManager _dbManager;
 
-    public CommandModule(BotDatabaseManager databaseManager)
+    public UserCommands(BotDatabaseManager databaseManager)
     {
         _dbManager = databaseManager;
     }
@@ -20,9 +20,11 @@ public class CommandModule : InteractionModuleBase<SocketInteractionContext>
 
     [CommandContextType(InteractionContextType.Guild)]
     [RequireUserPermission(GuildPermission.ManageGuild)]
-    [SlashCommand("setalertchannel", "Set a moderator-only channel to send bot alerts to")]
-    public async Task SetAlertChannelCommandAsync([ChannelTypes(ChannelType.Text)] IChannel channel)
+    [SlashCommand("alertchannel", "Set a channel to send bot alerts to")]
+    public async Task AlertChannelCommandAsync([ChannelTypes(ChannelType.Text)] IChannel channel)
     {
+        await DeferAsync();
+
         var guild = (Context.Channel as SocketGuildChannel)?.Guild;
         ArgumentNullException.ThrowIfNull(guild, nameof(guild));
 
@@ -31,6 +33,6 @@ public class CommandModule : InteractionModuleBase<SocketInteractionContext>
 
         await _dbManager.SaveGuildSettingsAsync(guildSettings);
 
-        await RespondAsync($"Alert channel successfully set to <#{channel.Id}>", ephemeral: true);
+        await FollowupAsync($"Alert channel successfully set to <#{channel.Id}>", ephemeral: true);
     }
 }

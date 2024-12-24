@@ -66,9 +66,11 @@ public class BotDatabaseManager
         return guildEntity;
     }
 
-    public async Task TrackUserAsync(SocketUser user) => await EnsureUserExistsAsync(user.Id, asTracking: false);
+    public async Task<UserEntity> TrackUserAsync(ulong userId, bool asTracking = false) => await EnsureUserExistsAsync(userId, asTracking);
 
-    public async Task TrackGuildAsync(SocketGuild guild) => await EnsureGuildExistsAsync(guild, asTracking: false);
+    public async Task<UserEntity> TrackUserAsync(SocketUser user, bool asTracking = false) => await EnsureUserExistsAsync(user.Id, asTracking);
+
+    public async Task<GuildEntity> TrackGuildAsync(SocketGuild guild, bool asTracking = false) => await EnsureGuildExistsAsync(guild, asTracking);
 
     public async Task UpdateGuildStatsAsync(SocketGuild guild, int numberOfScans, int malwareFoundCount = 0)
     {

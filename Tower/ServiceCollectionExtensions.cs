@@ -109,7 +109,8 @@ public static class ServiceCollectionExtensions
                 var token = config["DiscordToken"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
                 ArgumentNullException.ThrowIfNull(token, nameof(token));
                 options.Token = token;
-                options.TestGuildID = config.GetValue<ulong?>("Discord:TestGuildID");
+                options.TestGuildId = config.GetValue<ulong?>("Discord:TestGuildId");
+                options.AdminCommandsGuildId = config.GetValue<ulong?>("Discord:AdminCommandsGuildId");
             });
 
         services.AddHostedService<BotService>();
