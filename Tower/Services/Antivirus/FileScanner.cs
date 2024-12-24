@@ -78,6 +78,7 @@ public class FileScanner
             return await cache.SaveScanResultAsync(
                 url: fileUri,
                 type: ResourceType.File,
+                scanSource: "Microsoft Defender",
                 isMalware: isMalware,
                 isSuspicious: false,
                 md5Hash: md5Hash

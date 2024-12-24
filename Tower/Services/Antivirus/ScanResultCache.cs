@@ -21,13 +21,14 @@ public class ScanResultCache
     private static string HashLink(Uri uri)
     {
         var inputBytes = Encoding.UTF8.GetBytes(uri.ToString());
-        var inputHash = SHA256.HashData(inputBytes);
+        using SHA256 sha256 = SHA256.Create();
+        var inputHash = sha256.ComputeHash(inputBytes);
         return Convert.ToHexString(inputHash).ToLowerInvariant();
     }
 
     private static ScanResult MapToScanResult(ScannedLinkEntity linkEntity, Uri url)
     {
-        return new ScanResult(url.ToString(), linkEntity.Id, linkEntity.IsMalware, linkEntity.IsSuspicious);
+        return new ScanResult(url.ToString(), linkEntity.ScanSource, linkEntity.Id, linkEntity.IsMalware, linkEntity.IsSuspicious);
     }
 
     public async Task<ScanResult?> GetScanResultAsync(Uri url, ResourceType expectedType, string? md5Hash = null)
@@ -71,6 +72,7 @@ public class ScanResultCache
     public async Task<ScanResult> SaveScanResultAsync(
         Uri url,
         ResourceType type,
+        string scanSource,
         bool isMalware,
         bool isSuspicious,
         string? md5Hash = null,
@@ -84,6 +86,7 @@ public class ScanResultCache
             ?? new ScannedLinkEntity { LinkHash = linkHash };
 
         entity.Type = type;
+        entity.ScanSource = scanSource;
         entity.IsMalware = isMalware;
         entity.IsSuspicious = isSuspicious;
         entity.ScannedAt = DateTime.UtcNow;
@@ -100,6 +103,7 @@ public class ScanResultCache
             {
                 Link = url.ToString(),
                 ScannedLinkId = entity.Id,
+                ScanSource = scanSource,
                 IsMalware = isMalware,
                 IsSuspicious = isSuspicious,
             };
@@ -112,6 +116,7 @@ public class ScanResultCache
             {
                 Link = url.ToString(),
                 ScannedLinkId = null,
+                ScanSource = scanSource,
                 IsMalware = isMalware,
                 IsSuspicious = isSuspicious,
             };

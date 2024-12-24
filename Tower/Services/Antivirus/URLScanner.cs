@@ -49,6 +49,7 @@ public class URLScanner
         return await cache.SaveScanResultAsync(
             url: url,
             type: ResourceType.WebLink,
+            scanSource: "Google Web Risk",
             isMalware: apiResponse.IsMalware,
             isSuspicious: apiResponse.IsSuspicious,
             expireTime: apiResponse.ExpireTime

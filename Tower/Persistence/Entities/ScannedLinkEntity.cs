@@ -20,6 +20,7 @@ public class ScannedLinkEntity
 
     public ResourceType Type { get; set; } = ResourceType.Unknown;
 
+    public string ScanSource { get; set; } = null!;
     public bool IsMalware { get; set; }
     public bool IsSuspicious { get; set; }
     public DateTime ScannedAt { get; set; }
