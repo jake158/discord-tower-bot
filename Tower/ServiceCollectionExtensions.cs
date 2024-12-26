@@ -8,6 +8,8 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Quartz;
+using Tower.Jobs;
 using Tower.Persistence;
 using Tower.Services.Antivirus;
 using Tower.Services.Discord;
@@ -20,14 +22,16 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<TowerDbContext>(options =>
         {
             var connectionString = config.GetConnectionString("DefaultConnection");
-            var password = config["SqlServerPassword"] ?? Environment.GetEnvironmentVariable("SQL_SERVER_PASSWORD");
-            var sqlServerHost = Environment.GetEnvironmentVariable("SQL_SERVER_HOST") ?? "localhost";
-            var sqlServerPort = config["SqlServerPort"] ?? Environment.GetEnvironmentVariable("SQL_SERVER_PORT") ?? "1433";
+            var dbSettings = config.GetSection("DatabaseSettings");
+
+            var password = dbSettings["Password"] ?? Environment.GetEnvironmentVariable("DB_PASSWORD");
+            var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+            var port = dbSettings["Port"] ?? Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
 
             var conStrBuilder = new SqlConnectionStringBuilder(connectionString)
             {
                 Password = password,
-                DataSource = $"{sqlServerHost},{sqlServerPort}"
+                DataSource = $"{host},{port}"
             };
             options.UseSqlServer(conStrBuilder.ConnectionString);
         });
@@ -106,14 +110,46 @@ public static class ServiceCollectionExtensions
             .AddOptions<BotService.BotServiceOptions>()
             .Configure<IConfiguration>((options, config) =>
             {
-                var token = config["DiscordToken"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
+                var discordConfig = config.GetRequiredSection("Discord");
+                var token = discordConfig["Token"] ?? Environment.GetEnvironmentVariable("DISCORD_TOKEN");
                 ArgumentNullException.ThrowIfNull(token, nameof(token));
+
                 options.Token = token;
-                options.TestGuildId = config.GetValue<ulong?>("Discord:TestGuildId");
-                options.AdminCommandsGuildId = config.GetValue<ulong?>("Discord:AdminCommandsGuildId");
+                options.TestGuildId = discordConfig.GetValue<ulong?>("Commands:TestGuildId");
+                options.AdminCommandsGuildId = discordConfig.GetValue<ulong?>("Commands:AdminCommandsGuildId");
             });
 
         services.AddHostedService<BotService>();
+        return services;
+    }
+
+    public static IServiceCollection AddQuartzAndJobs(this IServiceCollection services, IConfiguration config)
+    {
+        services
+            .AddQuartz(q =>
+            {
+                // When sharding:
+                // q.SchedulerId = "Scheduler-Core";
+
+                q.UseDefaultThreadPool(tp =>
+                {
+                    tp.MaxConcurrency = 2;
+                });
+
+                q.AddJob<ReportDailyStatsJob>(ReportDailyStatsJob.Key, j => j
+                    .WithDescription("Job to report daily usage stats"));
+
+                q.AddTrigger(t => t
+                    .WithIdentity("Daily midnight UTC trigger")
+                    .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(0, 0))
+                    .ForJob(ReportDailyStatsJob.Key)
+                    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddMinutes(2))));
+            });
+
+        services
+            .Configure<ReportDailyStatsJob.ReportDailyStatsJobOptions>(config.GetSection("Discord:Jobs"))
+            .AddTransient<ReportDailyStatsJob>();
+
         return services;
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Quartz;
 using Tower.Persistence;
 
 namespace Tower;
@@ -43,7 +44,8 @@ internal sealed class Program
                     .AddDatabase(config)
                     .AddGoogleWebRisk(config)
                     .AddAntivirusServices(config)
-                    .AddDiscordServices(config);
+                    .AddDiscordServices(config)
+                    .AddQuartzAndJobs(config);
             })
             .ConfigureLogging(logging =>
             {
@@ -56,6 +58,9 @@ internal sealed class Program
         {
             var db = scope.ServiceProvider.GetRequiredService<TowerDbContext>();
             db.Database.Migrate();
+
+            var scheduler = await scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler();
+            await scheduler.Start();
         }
 
         await host.RunAsync();
