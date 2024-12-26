@@ -6,9 +6,9 @@ services:
       dockerfile: Dockerfile
     container_name: bot-dev
     environment:
-      - SQL_SERVER_PASSWORD=${SQL_SERVER_PASSWORD}
-      - SQL_SERVER_HOST=sqlserver
-      - SQL_SERVER_PORT=1433
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=sqlserver
+      - DB_PORT=1433
       - ANTIVIRUS_SERVER_HOST=host.docker.internal
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON}
@@ -25,9 +25,9 @@ services:
     container_name: sqlserver-dev
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=${SQL_SERVER_PASSWORD}
+      - SA_PASSWORD=${DB_PASSWORD}
     ports:
-      - "${SQL_SERVER_PORT:-1433}:1433"
+      - "${DB_PORT:-1433}:1433"
     volumes:
       - sqlvolume:/var/opt/mssql
     networks:
