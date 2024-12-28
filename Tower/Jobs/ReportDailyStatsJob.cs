@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Discord;
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Quartz;
+using Tower.Persistence;
 
 namespace Tower.Jobs;
 
@@ -11,28 +13,30 @@ namespace Tower.Jobs;
 public class ReportDailyStatsJob(
     ILogger<ReportDailyStatsJob> logger,
     DiscordSocketClient client,
+    TowerDbContext db,
     IOptions<ReportDailyStatsJob.ReportDailyStatsJobOptions> options) : IJob
 {
     public static readonly JobKey Key = new("report-daily-stats-job", "reporting");
+    public static readonly int RefireCount = 5;
 
     private readonly ILogger<ReportDailyStatsJob> _logger = logger;
     private readonly DiscordSocketClient _client = client;
+    private readonly TowerDbContext _db = db;
     private readonly ReportDailyStatsJobOptions _options = options.Value;
 
     public class ReportDailyStatsJobOptions
     {
         [Required]
         public ulong GuildToNotifyId { get; set; }
-
         [Required]
         public ulong ChannelToReportDailyStatsId { get; set; }
     }
 
     public async Task Execute(IJobExecutionContext context)
     {
-        if (context.RefireCount > 5)
+        if (context.RefireCount > RefireCount)
         {
-            _logger.LogError("Job execution failed after attempting to 5 refires times.");
+            _logger.LogError($"Job execution failed after attempting {RefireCount} refires.");
             return;
         }
 
@@ -40,6 +44,9 @@ public class ReportDailyStatsJob(
 
         try
         {
+            var guildStatsSum = await _db.GuildStats.SumAsync(gs => gs.ScansToday);
+            var userStatsSum = await _db.UserStats.SumAsync(us => us.ScansToday);
+
             var guildToNotify = _client.GetGuild(_options.GuildToNotifyId);
             var channelToNotify = guildToNotify.GetTextChannel(_options.ChannelToReportDailyStatsId);
 
@@ -49,7 +56,8 @@ public class ReportDailyStatsJob(
             var dailyInfoEmbed = new EmbedBuilder()
                 .WithTitle("Daily usage statistics")
                 .WithTimestamp(DateTime.UtcNow)
-                .WithDescription("Test...")
+                .AddField("Guild scans today", guildStatsSum, inline: false)
+                .AddField("User scans today", userStatsSum, inline: false)
                 .Build();
 
             await channelToNotify.SendMessageAsync(embed: dailyInfoEmbed);
@@ -58,9 +66,9 @@ public class ReportDailyStatsJob(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to fire reporting job");
+            _logger.LogWarning(ex, "Failed to execute reporting job");
 
-            throw new JobExecutionException(msg: "", refireImmediately: true, cause: ex);
+            throw new JobExecutionException(msg: "ReportDailyStatsJob failed", refireImmediately: true, cause: ex);
         }
     }
 }

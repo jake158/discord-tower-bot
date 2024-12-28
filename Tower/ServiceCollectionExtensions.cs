@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;
+using Quartz.Impl.Matchers;
 using Tower.Jobs;
 using Tower.Persistence;
 using Tower.Services.Antivirus;
@@ -128,8 +129,8 @@ public static class ServiceCollectionExtensions
         services
             .AddQuartz(q =>
             {
-                // When sharding:
-                // q.SchedulerId = "Scheduler-Core";
+                // Use for sharding later:
+                q.SchedulerId = "Scheduler-Core";
 
                 q.UseDefaultThreadPool(tp =>
                 {
@@ -144,11 +145,19 @@ public static class ServiceCollectionExtensions
                     .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(0, 0))
                     .ForJob(ReportDailyStatsJob.Key)
                     .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddMinutes(2))));
+
+                q.AddJob<DailyRateResetJob>(DailyRateResetJob.Key, j => j
+                    .WithDescription("Job to reset 'Scans today' for GuildStats and UserStats entities")
+                    .StoreDurably());
+
+                q.AddJobListener<ReportDailyStatsListener>(KeyMatcher<JobKey>.KeyEquals(ReportDailyStatsJob.Key));
             });
 
         services
             .Configure<ReportDailyStatsJob.ReportDailyStatsJobOptions>(config.GetSection("Discord:Jobs"))
-            .AddTransient<ReportDailyStatsJob>();
+            .AddTransient<ReportDailyStatsJob>()
+            .AddSingleton<ReportDailyStatsListener>()
+            .AddTransient<DailyRateResetJob>();
 
         return services;
     }
