@@ -71,16 +71,10 @@ public class BotDatabaseManager(ILogger<BotDatabaseManager> logger, TowerDbConte
         var guildEntity = await EnsureGuildExistsAsync(guild);
         var stats = guildEntity.Stats ??= new GuildStatsEntity { GuildId = guild.Id };
 
-        var now = DateTime.UtcNow;
-        if (stats.LastScanDate?.Date == now.AddDays(-1).Date)
-        {
-            stats.ScansToday = 0;
-        }
-
         stats.TotalScans += numberOfScans;
         stats.ScansToday += numberOfScans;
         stats.MalwareFoundCount += malwareFoundCount;
-        stats.LastScanDate = now;
+        stats.LastScanDate = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
     }
@@ -90,15 +84,9 @@ public class BotDatabaseManager(ILogger<BotDatabaseManager> logger, TowerDbConte
         var userEntity = await EnsureUserExistsAsync(user.Id);
         var stats = userEntity.Stats ??= new UserStatsEntity { UserId = user.Id };
 
-        var now = DateTime.UtcNow;
-        if (stats.LastScanDate?.Date == now.AddDays(-1).Date)
-        {
-            stats.ScansToday = 0;
-        }
-
         stats.TotalScans += numberOfScans;
         stats.ScansToday += numberOfScans;
-        stats.LastScanDate = now;
+        stats.LastScanDate = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
     }
