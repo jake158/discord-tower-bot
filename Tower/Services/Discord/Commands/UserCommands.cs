@@ -30,4 +30,22 @@ public class UserCommands(BotDatabaseManager databaseManager) : InteractionModul
 
         await FollowupAsync($"Alert channel successfully set to <#{channel.Id}>", ephemeral: true);
     }
+
+    [CommandContextType(InteractionContextType.Guild)]
+    [RequireUserPermission(GuildPermission.ManageGuild)]
+    [SlashCommand("togglescans", "Enable or disable scans for the entire guild.")]
+    public async Task ToggleScansCommandAsync(bool enabled)
+    {
+        await DeferAsync();
+
+        var guild = (Context.Channel as SocketGuildChannel)?.Guild;
+        ArgumentNullException.ThrowIfNull(guild, nameof(guild));
+
+        var guildSettings = await _dbManager.GetGuildSettingsAsync(guild);
+        guildSettings.IsScanEnabled = enabled;
+
+        await _dbManager.SaveGuildSettingsAsync(guildSettings);
+
+        await FollowupAsync($"Scans {(enabled ? "enabled" : "disabled")} successfully.", ephemeral: true);
+    }
 }

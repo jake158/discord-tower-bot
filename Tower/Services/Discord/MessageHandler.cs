@@ -20,17 +20,25 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, IAntivirusSc
     {
         if (messageParam is not SocketUserMessage message || message.Author.IsBot) return;
 
-        _logger.LogDebug($"Processing message: {message}. Initializing scope...");
+        _logger.LogDebug($"Processing message: {message}.");
 
         using var scope = _scopeFactory.CreateScope();
         var dbManager = scope.ServiceProvider.GetRequiredService<BotDatabaseManager>();
 
-        _logger.LogDebug($"Processing attachments/links...");
+        var guildChannel = message.Channel as SocketGuildChannel;
+        bool processAttachments = true;
 
-        int numberOfScans = QueueScans(message);
+        if (guildChannel != null)
+        {
+            // TODO: measure perf
+            var guildSettings = await dbManager.GetGuildSettingsAsync(guildChannel.Guild);
+            processAttachments = guildSettings.IsScanEnabled;
+            _logger.LogDebug($"ProcessAttachments: {processAttachments}");
+        }
+        int numberOfScans = processAttachments ? QueueScans(message) : 0;
 
 
-        if (numberOfScans > 0 && message.Channel is SocketGuildChannel guildChannel)
+        if (numberOfScans > 0 && guildChannel != null)
         {
             _logger.LogDebug($"Updating guild stats for message {message}...");
 
