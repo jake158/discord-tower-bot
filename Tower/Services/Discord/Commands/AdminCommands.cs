@@ -10,13 +10,13 @@ namespace Tower.Services.Discord.Commands;
 [Group("admin", "Admin commands")]
 [DontAutoRegister]
 public class AdminCommands(
-    IHostApplicationLifetime lifetime, 
-    TowerDbContext db, 
-    BotDatabaseManager dbManager) : InteractionModuleBase<SocketInteractionContext>
+    IHostApplicationLifetime lifetime,
+    TowerDbContext db,
+    BlacklistManager blacklistManager) : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly IHostApplicationLifetime _lifetime = lifetime;
     private readonly TowerDbContext _db = db;
-    private readonly BotDatabaseManager _dbManager = dbManager;
+    private readonly BlacklistManager _blacklistManager = blacklistManager;
 
     [SlashCommand("shutdown", "Shut down the bot")]
     public async Task ShutdownCommandAsync()
@@ -186,14 +186,14 @@ public class AdminCommands(
             await FollowupAsync($"Invalid User ID: {userIdString}", ephemeral: true);
             return;
         }
-
-        var user = await _db.Users.FindAsync(userId);
-
-        user ??= await _dbManager.TrackUserAsync(userId, asTracking: true);
-        user.Blacklisted = isBlacklisted;
-
-        _db.Users.Update(user);
-        await _db.SaveChangesAsync();
+        if (isBlacklisted)
+        {
+            await _blacklistManager.AddToBlacklistAsync(userId);
+        }
+        else
+        {
+            await _blacklistManager.RemoveFromBlacklistAsync(userId);
+        }
 
         await FollowupAsync($"User <@{userId}> has been {(isBlacklisted ? "blacklisted" : "unblacklisted")}.");
     }

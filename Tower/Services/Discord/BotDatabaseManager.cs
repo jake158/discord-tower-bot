@@ -141,4 +141,15 @@ public class BotDatabaseManager(ILogger<BotDatabaseManager> logger, TowerDbConte
         userEntity.Offenses.Add(userOffense);
         await _db.SaveChangesAsync();
     }
+
+    public async Task UpdateUserBlacklistStatusAsync(ulong userId, bool isBlacklisted)
+    {
+        var user = await _db.Users.FindAsync(userId);
+
+        user ??= await TrackUserAsync(userId, asTracking: true);
+        user.Blacklisted = isBlacklisted;
+
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+    }
 }
