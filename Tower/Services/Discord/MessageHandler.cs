@@ -10,13 +10,13 @@ public partial class MessageHandler(
     ILogger<MessageHandler> logger,
     IAntivirusScanQueue scanQueue,
     IServiceScopeFactory scopeFactory,
-    BlacklistManager blacklistManager,
+    DenialManager denialManager,
     MalwareHandler malwareHandler)
 {
     private readonly ILogger<MessageHandler> _logger = logger;
     private readonly IAntivirusScanQueue _scanQueue = scanQueue;
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
-    private readonly BlacklistManager _blacklistManager = blacklistManager;
+    private readonly DenialManager _denialManager = denialManager;
     private readonly MalwareHandler _malwareHandler = malwareHandler;
 
     [GeneratedRegex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.IgnoreCase)]
@@ -26,7 +26,7 @@ public partial class MessageHandler(
     {
         if (messageParam is not SocketUserMessage message
             || message.Author.IsBot
-            || _blacklistManager.IsBlacklisted(message.Author.Id)) return;
+            || _denialManager.IsRestricted(message.Author.Id)) return;
 
         _logger.LogDebug($"Processing message: {message}.");
 

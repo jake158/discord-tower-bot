@@ -12,11 +12,11 @@ namespace Tower.Services.Discord.Commands;
 public class AdminCommands(
     IHostApplicationLifetime lifetime,
     TowerDbContext db,
-    BlacklistManager blacklistManager) : InteractionModuleBase<SocketInteractionContext>
+    DenialManager denialManager) : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly IHostApplicationLifetime _lifetime = lifetime;
     private readonly TowerDbContext _db = db;
-    private readonly BlacklistManager _blacklistManager = blacklistManager;
+    private readonly DenialManager _denialManager = denialManager;
 
     [SlashCommand("shutdown", "Shut down the bot")]
     public async Task ShutdownCommandAsync()
@@ -188,11 +188,11 @@ public class AdminCommands(
         }
         if (isBlacklisted)
         {
-            await _blacklistManager.AddToBlacklistAsync(userId);
+            await _denialManager.AddToBlacklistAsync(userId);
         }
         else
         {
-            await _blacklistManager.RemoveFromBlacklistAsync(userId);
+            await _denialManager.RemoveFromBlacklistAsync(userId);
         }
 
         await FollowupAsync($"User <@{userId}> has been {(isBlacklisted ? "blacklisted" : "unblacklisted")}.");

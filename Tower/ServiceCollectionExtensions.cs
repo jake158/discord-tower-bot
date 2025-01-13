@@ -96,7 +96,7 @@ public static class ServiceCollectionExtensions
 
         services
             .AddScoped<BotDatabaseManager>()
-            .AddSingleton<BlacklistManager>()
+            .AddSingleton<DenialManager>()
             .AddSingleton(discordSocketConfig)
             .AddSingleton<DiscordSocketClient>()
             .AddSingleton<DiscordLogHandler>()
