@@ -2,17 +2,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using Tower.Persistence;
+using Tower.Services.Discord;
 
 namespace Tower.Jobs;
 
 [DisallowConcurrentExecution]
-public class DailyRateResetJob(ILogger<DailyRateResetJob> logger, TowerDbContext db) : IJob
+public class DailyRateResetJob(ILogger<DailyRateResetJob> logger, TowerDbContext db, DenialManager denialManager) : IJob
 {
     public static readonly JobKey Key = new("daily-rate-reset-job", "maintenance");
     public static readonly int RefireCount = 5;
 
     private readonly ILogger<DailyRateResetJob> _logger = logger;
     private readonly TowerDbContext _db = db;
+    private readonly DenialManager _denialManager = denialManager;
 
     public async Task Execute(IJobExecutionContext context)
     {
@@ -32,6 +34,9 @@ public class DailyRateResetJob(ILogger<DailyRateResetJob> logger, TowerDbContext
 
             _logger.LogInformation("Resetting UserStats scans today...");
             await _db.UserStats.ExecuteUpdateAsync(g => g.SetProperty(gs => gs.ScansToday, 0));
+
+            _logger.LogInformation("Resetting rate limits...");
+            await _denialManager.UnRateLimitAllAsync();
 
             await transaction.CommitAsync();
 
