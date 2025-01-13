@@ -7,6 +7,7 @@ public class UserEntity
     [Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
     public ulong UserId { get; set; }
     public bool Blacklisted { get; set; } = false;
+    public bool RateLimited { get; set; } = false;
 
     private ICollection<GuildEntity>? _ownedGuilds;
     private ICollection<UserOffenseEntity>? _offenses;
